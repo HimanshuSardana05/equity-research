@@ -88,6 +88,9 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .card.fs{position:fixed;inset:0;z-index:55;margin:0;border-radius:0;overflow:auto;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left))}
 .card.fs .chart{height:calc(100vh - 120px)!important;height:calc(100dvh - 120px)!important}
 body.fs-on{overflow:hidden}
+.rp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding:8px;border:1px solid var(--accent);border-radius:8px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.rp button{min-width:40px;font-size:15px}.rp .dt{font-family:var(--f-mono);font-size:13px;font-weight:600;margin-left:auto}
+.rp .hint{font-size:12px;color:var(--muted);flex-basis:100%}
 .lvtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
 .lvtab th,.lvtab td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}
 .lvtab td.n,.lvtab th.n{text-align:right;font-family:var(--f-mono)}
@@ -342,7 +345,10 @@ async function viewCompany(sym){
    </div>
    ${yrs<10?`<div class="banner">${yrs} years of fundamentals available${scr?` (${scr} from your Screener export)`:""}. The 10-year Coffee Can test and long valuation history need more years: export this company from Screener.in and drop the file in <span class="mono">data/screener_exports/</span>.</div>`:""}
    <div class="grid g2">
-    <div class="card"><div class="row between"><h3>Price · support &amp; resistance</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}<button id="fsbtn" title="Full screen" aria-label="Full screen chart">⤢</button></div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
+    <div class="card"><div class="row between"><h3>Price · support &amp; resistance</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}<button id="rpbtn" title="Bar replay" aria-label="Bar replay">⏯</button><button id="fsbtn" title="Full screen" aria-label="Full screen chart">⤢</button></div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
+     <div class="rp" id="rp" hidden><button id="rp-back" title="Back one bar" aria-label="Back one bar">◀︎</button><button id="rp-play" title="Play" aria-label="Play">▶︎</button><button id="rp-fwd" title="Forward one bar" aria-label="Forward one bar">▶︎|</button>
+      <select id="rp-speed" aria-label="Replay speed"><option value="1000">1 bar/s</option><option value="500" selected>2 bars/s</option><option value="200">5 bars/s</option><option value="100">10 bars/s</option></select>
+      <button id="rp-pick" title="Choose a new start">Start…</button><button id="rp-exit">Exit</button><span class="dt" id="rp-dt"></span><span class="hint" id="rp-hint"></span></div>
      <div class="row between" style="margin-top:8px"><div class="legend" id="lg-lv"></div>
       <select id="lvset" aria-label="Support and resistance settings"><option value="daily">Levels: daily-tuned</option><option value="given">Levels: your settings</option><option value="off">Levels: off</option></select><label class="row" style="gap:4px"><input type="checkbox" id="lvhist" checked> history</label></div><div id="lv-list"></div></div>
     <div class="card"><h3>Why it looks ${esc((vd.label||"").replace("Looks ","").toLowerCase()||"this way")}</h3>
@@ -377,21 +383,26 @@ async function viewCompany(sym){
 
   // price chart
   const pc=mkChart($("#ch-price"));
-  const P=c.price,hasOHLC=P.o&&P.o.some(x=>x!=null);let pl;
+  const P=c.price,hasOHLC=P.o&&P.o.some(x=>x!=null);let pl,DATA=[];const RP={on:false,idx:null,picking:false,timer:null};
   if(hasOHLC){
     pl=pc.addCandlestickSeries({upColor:css("--good"),downColor:css("--bad"),borderVisible:false,wickUpColor:css("--good"),wickDownColor:css("--bad")});
     const d=[];for(let i=0;i<P.t.length;i++){const o=P.o[i],h=P.h[i],l=P.l[i],cl=P.c[i];if(cl==null)continue;
       d.push(o!=null&&h!=null&&l!=null?{time:P.t[i],open:o,high:Math.max(h,o,cl),low:Math.min(l,o,cl),close:cl}:{time:P.t[i],open:cl,high:cl,low:cl,close:cl})}
-    pl.setData(d);
-  }else{pl=pc.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2});pl.setData(ser(P.t,P.c))}
+    pl.setData(d);DATA=d;
+  }else{pl=pc.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2});DATA=ser(P.t,P.c);pl.setData(DATA)}
   // support / resistance from the LevelIndicator (computed nightly in the pipeline)
   let plines=[];const IDX={};{let k=0;for(let i=0;i<P.t.length;i++)if(P.c[i]!=null)IDX[P.t[i]]=k++}
   const zl=$("#zlayer"),LV=c.levels||{};
   const drawLevels=()=>{
     const set=$("#lvset").value;plines.forEach(x=>pl.removePriceLine(x));plines=[];zl.innerHTML="";
     if(set==="off"){$("#lg-lv").innerHTML="";return}
-    const L=LV[set]||{zones:[],swings:[]};
-    const last=P.c[P.c.length-1];const dist=p=>last?((p/last-1)*100):null;
+    const L0=LV[set]||{zones:[],swings:[]};
+    const replay=RP.on&&RP.idx!=null&&RP.idx<DATA.length-1,asOf=replay?DATA[RP.idx].time:LV.as_of;
+    const H=L0.history||{zones:[],swings:[]},act=x=>x.from<=asOf&&x.to>=asOf;
+    const L=replay?{history:H,
+      zones:(H.zones||[]).filter(act).map(z=>({low:z.lo,high:z.hi,mid:(z.lo+z.hi)/2,touches:z.n,score:+(1-Math.exp(-z.n/7.163)).toFixed(2),side:z.side>0?"above":z.side<0?"below":"inside",firstPivotTime:z.from,lastPivotTime:"",since:z.from})),
+      swings:(H.swings||[]).filter(act).map(w=>({price:w.p,side:w.side>0?"high":"low",broken:w.b,pivotTime:"",holdBars:null,since:w.from}))}:L0;
+    const last=replay?DATA[RP.idx].close:P.c[P.c.length-1];const dist=p=>last?((p/last-1)*100):null;
     const zs=(L.zones||[]).map(z=>({...z,kind:z.side==="above"?"res":z.side==="below"?"sup":"in"}));
     let nr=0,ns=0;zs.slice().sort((a,b)=>Math.abs(a.mid-last)-Math.abs(b.mid-last)).forEach(z=>{z.tag=z.kind==="res"?"R"+(++nr):z.kind==="sup"?"S"+(++ns):"Z"});
     (L.swings||[]).forEach(w=>plines.push(pl.createPriceLine({price:w.price,color:w.side==="high"?css("--bad"):css("--good"),lineWidth:2,lineStyle:w.broken?2:0,axisLabelVisible:true,title:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":"")})));
@@ -405,25 +416,40 @@ async function viewCompany(sym){
     if($("#lvhist").checked&&L.history){
       const ts=pc.timeScale(),bs=Math.max(1,(ts.logicalToCoordinate(1)??1)-(ts.logicalToCoordinate(0)??0)),Wd=$("#ch-price").clientWidth-W;
       const X=t=>{const i=IDX[t];return i==null?null:ts.logicalToCoordinate(i)};const frag=document.createDocumentFragment();
-      (L.history.zones||[]).forEach(z=>{if(z.to===LV.as_of)return;const x1=X(z.from),x2=X(z.to);if(x1==null||x2==null||x2<-bs||x1>Wd)return;
+      (L.history.zones||[]).forEach(z=>{if(z.from>asOf||act(z))return;const x1=X(z.from),x2=X(z.to<asOf?z.to:asOf);if(x1==null||x2==null||x2<-bs||x1>Wd)return;
         const y1=pl.priceToCoordinate(z.hi),y2=pl.priceToCoordinate(z.lo);if(y1==null||y2==null)return;
         const el=document.createElement("div");el.className="zh "+(z.side>0?"res":z.side<0?"sup":"in");const l=Math.max(0,x1-bs/2),r=Math.min(Wd,x2+bs/2);
         el.style.cssText=`left:${l}px;width:${Math.max(2,r-l)}px;top:${Math.min(y1,y2)}px;height:${Math.max(2,Math.abs(y2-y1))}px`;frag.appendChild(el)});
-      (L.history.swings||[]).forEach(w=>{if(w.to===LV.as_of)return;const x1=X(w.from),x2=X(w.to);if(x1==null||x2==null||x2<-bs||x1>Wd)return;const y=pl.priceToCoordinate(w.p);if(y==null)return;
+      (L.history.swings||[]).forEach(w=>{if(w.from>asOf||act(w))return;const x1=X(w.from),x2=X(w.to<asOf?w.to:asOf);if(x1==null||x2==null||x2<-bs||x1>Wd)return;const y=pl.priceToCoordinate(w.p);if(y==null)return;
         const el=document.createElement("div");el.className="sw"+(w.b?" b":"");const l=Math.max(0,x1-bs/2),r=Math.min(Wd,x2+bs/2);
         el.style.cssText=`left:${l}px;width:${Math.max(2,r-l)}px;top:${y-1}px;border-color:var(${w.side>0?"--bad":"--good"})`;frag.appendChild(el)});
       zl.insertBefore(frag,zl.firstChild)}
     const nz=zs.length,nw=(L.swings||[]).length;
-    $("#lg-lv").innerHTML=nz||nw?`<span><i style="background:var(--bad)"></i>resistance</span><span><i style="background:var(--good)"></i>support</span><span>as of ${esc(LV.as_of||"")}</span>`
+    $("#lg-lv").innerHTML=nz||nw?`<span><i style="background:var(--bad)"></i>resistance</span><span><i style="background:var(--good)"></i>support</span><span>as of ${esc(asOf||"")}${replay?" (replay)":""}</span>`
       :`<span>No zones or swing levels in play with ${set==="given"?"your settings (built for 5-minute candles)":"these settings"}.</span>`;
-    const rows=[...zs.map(z=>({tag:z.tag,col:z.kind==="res"?"--bad":z.kind==="sup"?"--good":"--warn",what:(z.kind==="res"?"Resistance":z.kind==="sup"?"Support":"Price in zone"),lvl:`${nf(z.low,z.low<100?2:0)}–${nf(z.high,z.high<100?2:0)}`,d:dist(z.mid),info:`${z.touches} touches · score ${z.score} · last ${esc(z.lastPivotTime||"")}`})),
-      ...(L.swings||[]).map(w=>({tag:w.side==="high"?"SH":"SL",col:w.side==="high"?"--bad":"--good",what:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":""),lvl:nf(w.price,w.price<100?2:0),d:dist(w.price),info:`${esc(w.pivotTime||"")} · held ${w.holdBars} days`}))].sort((a,b)=>(b.d??0)-(a.d??0));
-    $("#lv-list").innerHTML=rows.length?`<div class="tablewrap"><table class="lvtab"><thead><tr><th></th><th class="hs">Level</th><th class="n">₹</th><th class="n">vs close</th><th class="hs">Detail</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="tag" style="background:var(${r.col})">${r.tag}</span></td><td class="hs">${r.what}</td><td class="n">${r.lvl}</td><td class="n">${r.d==null?"–":(r.d>0?"+":"")+r.d.toFixed(1)+"%"}</td><td class="note hs">${r.info}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:6px 0 0">Bright bands and tags are today’s levels. Faint bands and lines show what the indicator drew on each earlier day, using only the candles up to that day. Zones appear only when price is within ${set==="given"?"1":"3"} daily ATR of them. Close ₹${nf(last,last<100?2:0)}.</p>`:"";
+    const rows=[...zs.map(z=>({tag:z.tag,col:z.kind==="res"?"--bad":z.kind==="sup"?"--good":"--warn",what:(z.kind==="res"?"Resistance":z.kind==="sup"?"Support":"Price in zone"),lvl:`${nf(z.low,z.low<100?2:0)}–${nf(z.high,z.high<100?2:0)}`,d:dist(z.mid),info:`${z.touches} touches · score ${z.score}`+(z.lastPivotTime?` · last ${esc(z.lastPivotTime)}`:` · shown since ${esc(z.since||"")}`)})),
+      ...(L.swings||[]).map(w=>({tag:w.side==="high"?"SH":"SL",col:w.side==="high"?"--bad":"--good",what:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":""),lvl:nf(w.price,w.price<100?2:0),d:dist(w.price),info:w.holdBars==null?`shown since ${esc(w.since||"")}`:`${esc(w.pivotTime||"")} · held ${w.holdBars} days`}))].sort((a,b)=>(b.d??0)-(a.d??0));
+    $("#lv-list").innerHTML=rows.length?`<div class="tablewrap"><table class="lvtab"><thead><tr><th></th><th class="hs">Level</th><th class="n">₹</th><th class="n">vs close</th><th class="hs">Detail</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="tag" style="background:var(${r.col})">${r.tag}</span></td><td class="hs">${r.what}</td><td class="n">${r.lvl}</td><td class="n">${r.d==null?"–":(r.d>0?"+":"")+r.d.toFixed(1)+"%"}</td><td class="note hs">${r.info}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:6px 0 0">${replay&&!(H.zones||[]).length&&!(H.swings||[]).length?"No level history for this stock yet. ":""}Bright bands and tags are ${replay?"the levels on "+esc(asOf):"today’s levels"}. Faint bands and lines show what the indicator drew on each earlier day, using only the candles up to that day. Zones appear only when price is within ${set==="given"?"1":"3"} daily ATR of them. Close ₹${nf(last,last<100?2:0)}.</p>`:"";
   };
   const redraw=()=>requestAnimationFrame(()=>requestAnimationFrame(drawLevels));
   pc.timeScale().subscribeVisibleLogicalRangeChange(redraw);
   try{new ResizeObserver(redraw).observe($("#ch-price"))}catch(e){}
   $("#lvset").onchange=redraw;$("#lvhist").onchange=redraw;
+  const ts=pc.timeScale(),rpEl=$("#rp");
+  const rpLabel=()=>{const b=DATA[RP.idx];$("#rp-dt").textContent=b?`${b.time} · ₹${nf(b.close,b.close<100?2:0)}`:"";};
+  const rpStop=()=>{clearInterval(RP.timer);RP.timer=null;$("#rp-play").textContent="▶︎";$("#rp-play").title="Play"};
+  const rpSet=i=>{i=Math.max(20,Math.min(DATA.length-1,i));const lr=ts.getVisibleLogicalRange();const w=lr?Math.max(30,lr.to-lr.from):120;
+    RP.idx=i;pl.setData(DATA.slice(0,i+1));ts.setVisibleLogicalRange({from:i-w*0.85,to:i+w*0.15});rpLabel();
+    $("#rp-hint").textContent=i>=DATA.length-1?"Reached the latest candle.":"";if(i>=DATA.length-1)rpStop();redraw()};
+  const rpPick=()=>{rpStop();RP.picking=true;$("#rp-hint").textContent="Tap the chart where the replay should start.";pl.setData(DATA);RP.idx=null;$("#rp-dt").textContent="";redraw()};
+  const rpOn=on=>{RP.on=on;$("#rp").hidden=!on;$("#rpbtn").classList.toggle("on",on);if(on)rpPick();else{rpStop();RP.picking=false;RP.idx=null;pl.setData(DATA);const b=$("#rng button.on");if(b)setR(b.dataset.r);redraw()}};
+  pc.subscribeClick(p=>{if(!RP.on||!RP.picking||p.logical==null)return;RP.picking=false;rpSet(Math.round(p.logical))});
+  $("#rpbtn").onclick=()=>rpOn(!RP.on);$("#rp-exit").onclick=()=>rpOn(false);$("#rp-pick").onclick=rpPick;
+  const rpStart=()=>{if(RP.idx==null){RP.picking=false;rpSet(DATA.length-120)}};
+  $("#rp-back").onclick=()=>{rpStop();rpStart();rpSet(RP.idx-1)};$("#rp-fwd").onclick=()=>{rpStop();rpStart();rpSet(RP.idx+1)};
+  const rpRun=()=>{clearInterval(RP.timer);RP.timer=setInterval(()=>{if(!rpEl.isConnected){clearInterval(RP.timer);return}rpSet(RP.idx+1)},+$("#rp-speed").value)};
+  $("#rp-play").onclick=()=>{if(RP.timer){rpStop();return}rpStart();if(RP.idx>=DATA.length-1)return;$("#rp-play").textContent="⏸";$("#rp-play").title="Pause";rpRun()};
+  $("#rp-speed").onchange=()=>{if(RP.timer)rpRun()};
   const fsCard=$("#ch-price").closest(".card");
   const fsSet=on=>{fsCard.classList.toggle("fs",on);document.body.classList.toggle("fs-on",on);$("#fsbtn").textContent=on?"✕":"⤢";$("#fsbtn").title=on?"Exit full screen":"Full screen";redraw()};
   $("#fsbtn").onclick=async()=>{const on=!fsCard.classList.contains("fs");fsSet(on);
