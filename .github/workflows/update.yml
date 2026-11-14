@@ -25,6 +25,10 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_PROJECT: his-equity-research
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -51,9 +55,27 @@ jobs:
           git diff --cached --quiet || git commit -m "data: ${{ steps.mode.outputs.mode }} update $(date -u +%F)"
           git push || (git pull --rebase && git push)
       - run: python pipeline/build_site.py
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # Cloudflare Pages (private behind Cloudflare Access), once the two secrets exist
+      - name: Deploy to Cloudflare Pages
+        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CF_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CF_ACCOUNT }}
+        run: |
+          npx --yes wrangler@3.114.0 pages project create "$CF_PROJECT" --production-branch main 2>/dev/null || true
+          npx --yes wrangler@3.114.0 pages deploy dist --project-name "$CF_PROJECT" --branch main --commit-dirty=true
+      # GitHub Pages: only while the repository is public
+      - name: Repo visibility
+        id: vis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "private=$(gh api repos/$GITHUB_REPOSITORY --jq .private)" >> "$GITHUB_OUTPUT"
+      - if: steps.vis.outputs.private != 'true'
+        uses: actions/configure-pages@v5
+      - if: steps.vis.outputs.private != 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
       - id: deploy
+        if: steps.vis.outputs.private != 'true'
         uses: actions/deploy-pages@v4

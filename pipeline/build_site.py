@@ -16,7 +16,7 @@ body = (SITE / "page.html").read_text()
     '<link rel="icon" type="image/png" sizes="32x32" href="assets/logo-32.png?v=5">'
     '<link rel="icon" type="image/png" sizes="192x192" href="assets/logo-192.png?v=5">'
     '<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=5">'
-    '<link rel="manifest" href="manifest.webmanifest?v=5">'
+    '<link rel="manifest" href="manifest.webmanifest?v=5" crossorigin="use-credentials">'
     '<meta name="theme-color" content="#0b1530">'
     '<meta name="apple-mobile-web-app-capable" content="yes">'
     '<meta name="mobile-web-app-capable" content="yes">'
