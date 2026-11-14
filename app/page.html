@@ -187,11 +187,11 @@ footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px 
 <header class="mast"><div class="wrap">
   <a class="brand" href="#screen"><img src="assets/logo-64.png" alt="" width="30" height="30"><span>Nifty 500 Research Desk<small id="asof">loading…</small></span></a>
   <nav class="tabs" id="tabs">
+    <a href="#setups" data-v="setups">Setups</a>
     <a href="#screen" data-v="screen">Screen</a>
     <a href="#company" data-v="company">Company</a>
     <a href="#sector" data-v="sector">Sector peers</a>
     <a href="#factors" data-v="factors">Factor vs factor</a>
-    <a href="#setups" data-v="setups">Setups</a>
     <a href="#news" data-v="news">Announcements</a>
     <a href="#method" data-v="method">Method</a>
   </nav>
@@ -247,7 +247,7 @@ const ser=(t,v)=>{const o=[];for(let i=0;i<t.length;i++)if(v[i]!=null&&isFinite(
 /* ---------- routing ---------- */
 let current="screen";
 function route(){
-  const h=decodeURIComponent(location.hash.slice(1))||"screen";
+  const h=decodeURIComponent(location.hash.slice(1))||"setups";
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on",h===a.dataset.v||h.startsWith(a.dataset.v+"-")));
   clearCharts();
   if(h.startsWith("company-"))return viewCompany(dec(h.slice(8)));
@@ -396,6 +396,7 @@ async function viewCompany(sym){
 
   // price chart
   const pc=mkChart($("#ch-price"));pc.timeScale().applyOptions({fixRightEdge:false,rightOffset:4});
+  pc.applyOptions({watermark:{visible:true,text:innerWidth<700?sym:`${sym} · ${c.name||""}`,fontSize:11,fontFamily:"IBM Plex Mono, monospace",color:css("--muted"),horzAlign:"right",vertAlign:"bottom"}});
   const P=c.price,hasOHLC=P.o&&P.o.some(x=>x!=null);let pl,DATA=[];const RP={on:false,idx:null,picking:false,timer:null};
   if(hasOHLC){
     pl=pc.addCandlestickSeries({upColor:css("--up"),downColor:css("--down"),borderVisible:true,borderUpColor:css("--up"),borderDownColor:css("--down"),wickUpColor:css("--up"),wickDownColor:css("--down")});
@@ -728,7 +729,7 @@ async function viewSetups(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading setups…</div>';
   let D;try{D=await setupsData()}catch(e){v.innerHTML='<div class="empty">Setups appear after the next daily build.</div>';return}
   let R=await suRules();
-  if(location.hash!=="#setups")return;
+  if((location.hash.slice(1)||"setups")!=="setups")return;
   const P=D.patterns||PATNAME,dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
   const A=D.all?D.all.rows.map(r=>{const o={};D.all.cols.forEach((c,i)=>o[c]=r[i]);o.pattern=D.all.patterns[o.p];o.kind=o.kind?"break":"test";o.lt=o.lt?"swing":"zone";o.trend=!!o.trend;o.dir=(D.pattern_dir||{})[o.pattern]??(/^(bull|pier|morn)/.test(o.pattern)?1:-1);return o}):null;
   const W=[["level","Level strength","How many times price has respected the level (full marks at the level score below)"],["pattern","Pattern quality","How clean the candle pattern is"],["volume","Volume","Signal-day volume vs its 20-day average"],["trend","Trend fit","Reversals after a move into the level; breakouts with the 20-day trend"]];
