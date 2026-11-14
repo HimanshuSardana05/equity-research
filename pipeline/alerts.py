@@ -62,10 +62,10 @@ def notify_email(alerts: list[dict], cfg: dict) -> int:
         print("email: secrets missing, skipped")
         return 0
     msg = EmailMessage()
-    msg["Subject"] = f"{len(alerts)} setup{'s' if len(alerts) != 1 else ''} · {alerts[0]['date']}"
+    msg["Subject"] = f"{len(alerts)} setup alert{'s' if len(alerts) != 1 else ''} · {alerts[0]['date']}"
     msg["From"] = os.environ["SMTP_USER"]
     msg["To"] = os.environ["ALERT_EMAIL_TO"]
-    msg.set_content("\n".join(f"{a['text']}\n{a['url']}\n" for a in alerts)
+    msg.set_content("\n".join(f"{a['text']}\n{a.get('url', SITE_URL + '/#company-' + a['symbol'])}\n" for a in alerts)
                     + "\nResearch tool for personal use, not investment advice.")
     with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.environ.get("SMTP_PORT") or 587), timeout=30) as s:
         s.starttls()
@@ -101,7 +101,8 @@ def main(send: bool) -> None:
         print("no alerts feed")
         return
     sent = set(json.loads(SENT.read_text())) if SENT.exists() else set()
-    fresh = [a for a in feed.get("alerts", []) if a["id"] not in sent][: int(al.get("max_per_run") or 25)]
+    items = feed.get("signals", []) + feed.get("alerts", [])  # live strategy signals first, then setups
+    fresh = [a for a in items if a["id"] not in sent][: int(al.get("max_per_run") or 25)]
     print(f"{len(fresh)} new alert(s) for {feed.get('as_of')}")
     for a in fresh:
         print("  ", a["text"])

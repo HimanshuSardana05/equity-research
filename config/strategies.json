@@ -1,0 +1,4 @@
+{
+  "about": "Live strategies for alerts. Save a strategy in the Backtest tab, mark it live, then use 'Download live strategies' and replace this file (or ask Claude). The daily build lists their signals in app/data/alerts.json; sending stays off until alerts are enabled in setup_rules.json.",
+  "strategies": []
+}

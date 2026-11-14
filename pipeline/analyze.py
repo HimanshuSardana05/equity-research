@@ -23,6 +23,8 @@ from prices import load_prices
 from levels import compute_levels_full, precompute, history_for
 from setups import find_setups, baseline, summarize, load_rules, PATTERNS
 from alerts import build_alerts
+from signals import candidates, live_signals, COLS as CAND_COLS, VOL_FLOOR
+from setups import score as setup_score
 
 
 def _f(x):
@@ -281,6 +283,7 @@ def percentile(series, x):
 # --------------------------------------------------------------------------- main build
 _BASE = {"r5": [], "r10": [], "r20": []}
 RULES = load_rules()
+_CANDS = {}
 
 
 def _setups(sym, prices):
@@ -290,7 +293,12 @@ def _setups(sym, prices):
             b = baseline(prices, h["t"][0])
             for k in _BASE:
                 _BASE[k].extend(b[k])
-        return find_setups(prices, h, RULES)
+        ss = find_setups(prices, h, RULES)
+        try:
+            _CANDS[sym] = candidates(prices, h, ss)
+        except Exception as e:
+            print("candidates fail", sym, repr(e))
+        return ss
     except Exception as e:
         print("setups fail", sym, repr(e))
         return []
@@ -645,7 +653,29 @@ def build_all(universe: list[dict]):
         "patterns": {k: v[0] for k, v in PATTERNS.items()}, "pattern_dir": {k: v[1] for k, v in PATTERNS.items()},
         "all": {"syms": syms, "patterns": pkeys, "cols": cols, "rows": rows},
     })
-    write_json(SITE_DATA / "alerts.json", build_alerts(recent, RULES, dates[-1] if dates else None))
+    # ----- backtest candidates (Backtest tab) and live strategy signals
+    cands = []
+    for sym in syms:
+        for r in _CANDS.get(sym, []):
+            r[0] = sidx[sym]
+            cands.append(r)
+    cal = sorted({d for c in companies.values() for d in (c.get("price") or {}).get("t", [])[-700:]})
+    cal = [d for d in cal if not dates or d >= dates[0]]
+    write_json(SITE_DATA / "backtest.json", {
+        "as_of": dates[-1] if dates else None, "cols": CAND_COLS, "syms": syms,
+        "names": [companies[s_]["name"] for s_ in syms], "patterns": pkeys,
+        "pattern_dir": {k: v[1] for k, v in PATTERNS.items()}, "cal": cal, "vol_floor": VOL_FLOOR,
+        "rows": [r for r in cands if (r[CAND_COLS.index("vol")] or 0) >= VOL_FLOOR],
+    })
+    recent_dates = [d for d in cal if d <= (dates[-1] if dates else "")][-6:]
+    recent_c = [r for r in cands if r[1] in set(recent_dates)]
+    write_json(SITE_DATA / "signals_recent.json", {"as_of": dates[-1] if dates else None, "cols": CAND_COLS, "syms": syms,
+                                                    "patterns": pkeys, "cal": recent_dates, "rows": recent_c})
+    ci = {k: CAND_COLS.index(k) for k in ("zs", "strength", "vol", "trend")}
+    score_of = lambda r: setup_score({"zs": r[ci["zs"]] or 0, "strength": r[ci["strength"]], "vol": r[ci["vol"]], "trend": r[ci["trend"]]}, RULES)
+    feed = build_alerts(recent, RULES, dates[-1] if dates else None)
+    feed["signals"] = live_signals(recent_c, syms, score_of, dates[-1] if dates else None, recent_dates)
+    write_json(SITE_DATA / "alerts.json", feed)
     write_json(SITE_DATA / "sectors.json", sectors)
     feed = []
     for sym, evs in events_by_sym.items():
