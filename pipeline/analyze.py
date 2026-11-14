@@ -20,6 +20,7 @@ from common import CONFIG, FUND, SITE_DATA, is_financial, now_iso, read_json, wr
 from events import load_events
 from fundamentals import fiscal_years
 from prices import load_prices
+from levels import compute_levels
 
 
 def _f(x):
@@ -380,7 +381,10 @@ def build_company(u: dict, events_by_sym: dict) -> dict | None:
         "about": (info.get("longBusinessSummary") or "")[:900], "website": info.get("website"),
         "metrics": m, "history_stats": hist,
         "annual": annual, "ttm": ttm, "sources": {str(k): v for k, v in source.items()},
-        "price": {"t": [d.strftime("%Y-%m-%d") for d in prices.index], "c": prices["close"].round(2).tolist()},
+        "price": {"t": [d.strftime("%Y-%m-%d") for d in prices.index], "c": prices["close"].round(2).tolist(),
+                  "o": prices["open"].round(2).tolist(), "h": prices["high"].round(2).tolist(),
+                  "l": prices["low"].round(2).tolist()},
+        "levels": compute_levels(prices),
         "val": val, "dcf": dcf,
         "coffee_can": coffee_can(annual, fin),
         "buffett": buffett_checks(annual, fin, val["mcap"] if val else None, val["t"] if val else None),

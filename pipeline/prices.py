@@ -17,6 +17,9 @@ from common import PRICES, UA, yf_symbol
 BHAV_URL = "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{d}_F_0000.csv.zip"
 
 
+COLS = ["open", "high", "low", "close", "volume"]
+
+
 def price_path(sym):
     return PRICES / f"{sym}.csv"
 
@@ -24,16 +27,20 @@ def price_path(sym):
 def load_prices(sym) -> pd.DataFrame:
     p = price_path(sym)
     if not p.exists():
-        return pd.DataFrame(columns=["close", "volume"])
+        return pd.DataFrame(columns=COLS)
     df = pd.read_csv(p, parse_dates=["date"]).set_index("date").sort_index()
-    return df[~df.index.duplicated(keep="last")]
+    for c in COLS:
+        if c not in df:
+            df[c] = float("nan")
+    return df[~df.index.duplicated(keep="last")][COLS]
 
 
 def save_prices(sym, df: pd.DataFrame):
     df = df[~df.index.duplicated(keep="last")].sort_index()
-    out = df[["close", "volume"]].copy()
+    out = df.reindex(columns=COLS).copy()
     out.index.name = "date"
-    out["close"] = out["close"].round(2)
+    for c in ("open", "high", "low", "close"):
+        out[c] = out[c].round(2)
     out["volume"] = out["volume"].fillna(0).astype("int64")
     out.to_csv(price_path(sym), date_format="%Y-%m-%d")
 
@@ -50,10 +57,11 @@ def backfill_yf(symbols: list[str], period="max", batch=50):
         for s, t in zip(chunk, tickers):
             try:
                 d = data[t] if len(tickers) > 1 else data
-                d = d[["Close", "Volume"]].dropna(subset=["Close"])
+                d = d[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
                 if d.empty:
                     continue
-                d = d.rename(columns={"Close": "close", "Volume": "volume"})
+                # yfinance's Close here is split-adjusted only; scale O/H/L consistently with it
+                d = d.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
                 d.index = pd.to_datetime(d.index).tz_localize(None).normalize()
                 if period != "max":  # merge recent rows into stored history
                     old = load_prices(s)
@@ -74,8 +82,9 @@ def fetch_bhavcopy(d: date) -> pd.DataFrame | None:
         with zipfile.ZipFile(io.BytesIO(r.content)) as z:
             df = pd.read_csv(z.open(z.namelist()[0]))
         df = df[df["SctySrs"].isin(["EQ", "BE", "BZ"])]
-        return df[["TckrSymb", "ClsPric", "TtlTradgVol"]].rename(
-            columns={"TckrSymb": "symbol", "ClsPric": "close", "TtlTradgVol": "volume"})
+        return df[["TckrSymb", "OpnPric", "HghPric", "LwPric", "ClsPric", "TtlTradgVol"]].rename(
+            columns={"TckrSymb": "symbol", "OpnPric": "open", "HghPric": "high", "LwPric": "low",
+                     "ClsPric": "close", "TtlTradgVol": "volume"})
     except Exception as e:
         print("bhavcopy fail", d, e)
         return None
@@ -107,7 +116,8 @@ def append_bhavcopies(symbols: list[str], lookback_days=10) -> list[str]:
                 if isinstance(row, pd.DataFrame):
                     row = row.iloc[0]
                 df = load_prices(s)
-                df.loc[pd.Timestamp(d)] = [float(row["close"]), int(row["volume"])]
+                df.loc[pd.Timestamp(d)] = [float(row["open"]), float(row["high"]), float(row["low"]),
+                                           float(row["close"]), int(row["volume"])]
                 save_prices(s, df)
                 last_dates[s] = d
     return fetched
