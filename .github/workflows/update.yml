@@ -25,10 +25,6 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    env:
-      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CF_PROJECT: his-equity-research
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -55,15 +51,18 @@ jobs:
           git diff --cached --quiet || git commit -m "data: ${{ steps.mode.outputs.mode }} update $(date -u +%F)"
           git push || (git pull --rebase && git push)
       - run: python pipeline/build_site.py
-      # Cloudflare Pages (private behind Cloudflare Access), once the two secrets exist
-      - name: Deploy to Cloudflare Pages
-        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ env.CF_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ env.CF_ACCOUNT }}
+      # Publish the built site to the 'site' branch (one commit, replaced each run).
+      # Cloudflare Pages watches that branch and serves it behind Cloudflare Access.
+      - name: Publish site branch
         run: |
-          npx --yes wrangler@3.114.0 pages project create "$CF_PROJECT" --production-branch main 2>/dev/null || true
-          npx --yes wrangler@3.114.0 pages deploy dist --project-name "$CF_PROJECT" --branch main --commit-dirty=true
+          cd dist
+          git init -q -b site
+          git config user.name "data-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "site build $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
+          rm -rf .git
       # GitHub Pages: only while the repository is public
       - name: Repo visibility
         id: vis
