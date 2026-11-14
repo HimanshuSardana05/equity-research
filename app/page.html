@@ -8,7 +8,7 @@
 :root{
   --bg:#f5f7fa; --panel:#ffffff; --ink:#14202e; --muted:#5b6b7d; --line:#dfe5ec; --soft:#eef2f7;
   --accent:#1d5fd1; --accent-ink:#ffffff;
-  --good:#127a4b; --good-bg:#e3f4ec; --bad:#b4372d; --bad-bg:#fbe9e7; --warn:#9a6400; --warn-bg:#fdf1db;
+  --good:#127a4b; --good-bg:#e3f4ec; --up:#0f9d58; --down:#d93025; --bad:#b4372d; --bad-bg:#fbe9e7; --warn:#9a6400; --warn-bg:#fdf1db;
   --chart-grid:#edf1f5;
   --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -19,12 +19,12 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
   --accent:#6aa1ff; --accent-ink:#0b1220;
-  --good:#4cc38a; --good-bg:#12301f; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
+  --good:#4cc38a; --good-bg:#12301f; --up:#2fd384; --down:#ff4d4d; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
   --chart-grid:#1c2633; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
   --accent:#6aa1ff; --accent-ink:#0b1220;
-  --good:#4cc38a; --good-bg:#12301f; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
+  --good:#4cc38a; --good-bg:#12301f; --up:#2fd384; --down:#ff4d4d; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
   --chart-grid:#1c2633; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
@@ -74,12 +74,15 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .chart td,.chart th{padding:0!important;border:0!important;min-width:0!important;max-width:none!important;white-space:nowrap!important;background:none!important;position:static!important}
 .chart tr:hover{background:none!important}
 .chart.sm{height:240px}
-.zlayer{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.zlayer{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}.ztags{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}.chart>.tv-lightweight-charts{position:relative;z-index:1}
+.sunav{position:absolute;top:6px;left:6px;z-index:5;display:flex;align-items:center;gap:4px;padding:3px;border-radius:999px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 90%,transparent);font-size:12px;max-width:calc(100% - 80px)}
+.sunav button{min-width:38px;height:34px;border-radius:999px;font-size:20px;font-weight:700;line-height:1;padding:0 8px}.sunav button:disabled{opacity:.35}
+.sunav .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
 .zone{position:absolute;left:0;border-block:2px solid}
 .zone span{position:absolute;left:6px;font-size:11px;font-weight:600;font-family:var(--f-mono);white-space:nowrap;color:#fff;padding:1px 6px;border-radius:4px}
-.z-res{background:color-mix(in srgb,var(--bad) 30%,transparent);border-color:var(--bad)}.z-res span{background:var(--bad)}
-.z-sup{background:color-mix(in srgb,var(--good) 30%,transparent);border-color:var(--good)}.z-sup span{background:var(--good)}
-.z-in{background:color-mix(in srgb,var(--warn) 32%,transparent);border-color:var(--warn)}.z-in span{background:var(--warn)}
+.z-res{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:var(--bad)}.z-res span{background:var(--bad)}
+.z-sup{background:color-mix(in srgb,var(--good) 18%,transparent);border-color:var(--good)}.z-sup span{background:var(--good)}
+.z-in{background:color-mix(in srgb,var(--warn) 20%,transparent);border-color:var(--warn)}.z-in span{background:var(--warn)}
 .zh{position:absolute;pointer-events:none}
 .zh.res{background:color-mix(in srgb,var(--bad) 16%,transparent);border-block:1px solid color-mix(in srgb,var(--bad) 45%,transparent)}
 .zh.sup{background:color-mix(in srgb,var(--good) 16%,transparent);border-block:1px solid color-mix(in srgb,var(--good) 45%,transparent)}
@@ -355,7 +358,7 @@ async function viewCompany(sym){
    </div>
    ${yrs<10?`<div class="banner">${yrs} years of fundamentals available${scr?` (${scr} from your Screener export)`:""}. The 10-year Coffee Can test and long valuation history need more years: export this company from Screener.in and drop the file in <span class="mono">data/screener_exports/</span>.</div>`:""}
    <div class="grid g2">
-    <div class="card"><div class="row between pc-head"><button class="fsx" id="fsx" aria-label="Exit full screen">✕ Exit</button><h3 class="pc-title">Price · support &amp; resistance</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}<button id="rpbtn" title="Bar replay" aria-label="Bar replay">⏯</button><button id="fsbtn" title="Full screen" aria-label="Full screen chart">⤢</button></div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
+    <div class="card"><div class="row between pc-head"><button class="fsx" id="fsx" aria-label="Exit full screen">✕ Exit</button><h3 class="pc-title">Price · support &amp; resistance</h3><div class="row" id="rng">${["Auto","6M","1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}" title="${r==="Auto"?"The candles that matter: the levels in play and the recent move":r}">${r}</button>`).join("")}<button id="rpbtn" title="Bar replay" aria-label="Bar replay">⏯</button><button id="fsbtn" title="Full screen" aria-label="Full screen chart">⤢</button></div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div><div class="ztags" id="ztags"></div></div>
      <div class="rp" id="rp" hidden><button id="rp-back" title="Back one bar" aria-label="Back one bar">◀︎</button><button id="rp-play" title="Play" aria-label="Play">▶︎</button><button id="rp-fwd" title="Forward one bar" aria-label="Forward one bar">▶︎|</button>
       <select id="rp-speed" aria-label="Replay speed"><option value="1000">1 bar/s</option><option value="500" selected>2 bars/s</option><option value="200">5 bars/s</option><option value="100">10 bars/s</option></select>
       <button id="rp-pick" title="Choose a new start">Start…</button><button id="rp-exit">Exit</button><span class="dt" id="rp-dt"></span><span class="hint" id="rp-hint"></span></div>
@@ -395,7 +398,7 @@ async function viewCompany(sym){
   const pc=mkChart($("#ch-price"));pc.timeScale().applyOptions({fixRightEdge:false,rightOffset:4});
   const P=c.price,hasOHLC=P.o&&P.o.some(x=>x!=null);let pl,DATA=[];const RP={on:false,idx:null,picking:false,timer:null};
   if(hasOHLC){
-    pl=pc.addCandlestickSeries({upColor:css("--good"),downColor:css("--bad"),borderVisible:false,wickUpColor:css("--good"),wickDownColor:css("--bad")});
+    pl=pc.addCandlestickSeries({upColor:css("--up"),downColor:css("--down"),borderVisible:true,borderUpColor:css("--up"),borderDownColor:css("--down"),wickUpColor:css("--up"),wickDownColor:css("--down")});
     const d=[];for(let i=0;i<P.t.length;i++){const o=P.o[i],h=P.h[i],l=P.l[i],cl=P.c[i];if(cl==null)continue;
       d.push(o!=null&&h!=null&&l!=null?{time:P.t[i],open:o,high:Math.max(h,o,cl),low:Math.min(l,o,cl),close:cl}:{time:P.t[i],open:cl,high:cl,low:cl,close:cl})}
     pl.setData(d);DATA=d;
@@ -411,8 +414,8 @@ async function viewCompany(sym){
     const ws=(H.swings||[]).slice().sort((a,b)=>a.from<b.from?-1:1),ow=[];
     ws.forEach(w=>{const i=IDX[w.from];const p=ow.find(o=>o.side===w.side&&o.p===w.p&&IDX[o.to]+1===i&&!o.next);if(p){p.next=w;w.start=p.start}else w.start=w.from;ow.push(w)});
     return CH[set]={zones:zs,swings:ws}};
-  const drawLevels=()=>{
-    const set=$("#lvset").value;plines.forEach(x=>pl.removePriceLine(x));plines=[];zl.innerHTML="";
+  const drawLevels=()=>{if(!zl.isConnected)return;
+    const set=$("#lvset").value;plines.forEach(x=>pl.removePriceLine(x));plines=[];zl.innerHTML="";$("#ztags").innerHTML="";
     if(set==="off"){$("#lg-lv").innerHTML="";return}
     const L0=LV[set]||{zones:[],swings:[]};
     const replay=RP.on&&RP.idx!=null&&RP.idx<DATA.length-1,asOf=replay?DATA[RP.idx].time:LV.as_of;
@@ -440,7 +443,7 @@ async function viewCompany(sym){
     {const placed=[],hit=(x,y,w)=>placed.some(p=>x<p.x+p.w+3&&x+w+3>p.x&&Math.abs(y-p.y)<17);
       tags.sort((a,b)=>b.x-a.x||a.k-b.k).forEach(g=>{const w=g.t.length*7+12;let x=g.out?g.x-6-w:g.x+6,y=g.y-9;let n=0;
         while(hit(x,y,w)&&n++<40)x=g.out||x>w*2?x-(w+4):x+(w+4);if(x<0)x=2;placed.push({x,y,w});
-        const sp=document.createElement("span");sp.className="ztag";sp.textContent=g.t;sp.style.cssText=`left:${x}px;top:${y}px;background:var(${g.col})`;zl.appendChild(sp)})}
+        const sp=document.createElement("span");sp.className="ztag";sp.textContent=g.t;sp.style.cssText=`left:${x}px;top:${y}px;background:var(${g.col})`;$("#ztags").appendChild(sp)})}
     if($("#lvhist").checked&&H){
       const ts=pc.timeScale(),bs=Math.max(1,(ts.logicalToCoordinate(1)??1)-(ts.logicalToCoordinate(0)??0)),Wd=$("#ch-price").clientWidth-W;
       const X=t=>{const i=IDX[t];return i==null?null:ts.logicalToCoordinate(i)};const frag=document.createDocumentFragment();
@@ -484,28 +487,42 @@ async function viewCompany(sym){
   const SU0=(c.setups||[]).slice().sort((a,b)=>a.date<b.date?-1:1);let SU=SU0;
   const setMk=upto=>{try{pl.setMarkers(SU.filter(x=>!upto||x.date<=upto).map(x=>({time:x.date,position:x.dir>0?"belowBar":"aboveBar",color:x.dir>0?css("--good"):css("--bad"),shape:x.dir>0?"arrowUp":"arrowDown",text:innerWidth<700?"":PATSHORT[x.pattern]+(x.kind==="break"?" ↗":"")})))}catch(e){}};
   setMk();
-  suRules().then(R=>{SU=SU0.filter(x=>x.zs==null||suPass(x,R));if(RP.idx==null)setMk();else setMk(DATA[RP.idx].time)});
+  suRules().then(R=>{if(!zl.isConnected)return;SU=SU0.filter(x=>x.zs==null||suPass(x,R));if(RP.idx==null)setMk();else setMk(DATA[RP.idx].time)});
   const fsCard=$("#ch-price").closest(".card");
   const fsSet=on=>{fsCard.classList.toggle("fs",on);document.body.classList.toggle("fs-on",on);redraw()};
-  const fsOpen=()=>fsCard.classList.contains("fs");
+  const fsOpen=()=>fsCard.classList.contains("fs");let nativeFs=false;
   const fsEnter=async()=>{if(fsOpen())return;fsSet(true);try{history.pushState({fs:1},"")}catch(e){}
-    try{if(fsCard.requestFullscreen){await fsCard.requestFullscreen();await screen.orientation?.lock?.("landscape")}}catch(e){}};
+    try{if(fsCard.requestFullscreen){await fsCard.requestFullscreen();nativeFs=true;await screen.orientation?.lock?.("landscape")}}catch(e){}};
   const fsExit=()=>{if(!fsOpen())return;fsSet(false);try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}
     try{screen.orientation?.unlock?.()}catch(e){}if(history.state&&history.state.fs)history.back()};
   $("#fsbtn").onclick=fsEnter;$("#fsx").onclick=fsExit;
   window.addEventListener("popstate",()=>{if(fsOpen()&&document.body.contains(fsCard)){fsSet(false);try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}}});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&fsOpen()&&document.body.contains(fsCard))fsExit()});
-  document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&fsOpen()&&document.body.contains(fsCard))fsExit()});
+  document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&nativeFs&&fsOpen()&&document.body.contains(fsCard)){nativeFs=false;fsExit()}});
+  if(S.keepFs){S.keepFs=false;fsSet(true)}
+  {const navEl=document.createElement("div");navEl.className="sunav";navEl.hidden=true;$("#ch-price").appendChild(navEl);
+   (async()=>{let N=S.setupNav;
+     if(!N||!N.list.some(x=>x.sym===sym)){try{const D=await setupsData(),R=await suRules();
+       N={list:D.recent.filter(r=>r.date===D.as_of&&suPass(r,R)).map(r=>({sym:r.symbol,date:r.date,sc:suScore(r,R),pattern:r.pattern,dir:r.dir})).sort((a,b)=>b.sc-a.sc),i:0}}catch(e){return}}
+     let i=N.list[N.i]&&N.list[N.i].sym===sym?N.i:N.list.findIndex(x=>x.sym===sym);if(i<0||!navEl.isConnected)return;N.i=i;S.setupNav=N;const it=N.list[i];
+     navEl.innerHTML=`<button data-d="-1" aria-label="Previous setup" title="Previous setup"${i===0?" disabled":""}>‹</button><span class="t"><b>${i+1} / ${N.list.length}</b> · <span style="color:var(${it.dir>0?"--good":"--bad"})">${it.dir>0?"▲":"▼"} ${esc(PATSHORT[it.pattern]||"")}</span> · ${it.sc}</span><button data-d="1" aria-label="Next setup" title="Next setup"${i===N.list.length-1?" disabled":""}>›</button>`;navEl.hidden=false;
+     navEl.onclick=e=>{const b=e.target.closest("button[data-d]");if(!b||b.disabled)return;const j=i+(+b.dataset.d),n=N.list[j];N.i=j;S.focusSetup={sym:n.sym,date:n.date};S.keepFs=fsOpen();
+       if(fsOpen())fsSet(false);goCompany(n.sym)}})()}
   const t0=c.price.t[0]||"",yrsHist=c.price.t.length?(new Date(c.price.t[c.price.t.length-1])-new Date(t0))/3.156e10:0;
-  $("#rng").querySelectorAll("button").forEach(b=>{const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[b.dataset.r];if(y&&y>yrsHist+0.5)b.hidden=true});
-  const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];
+  $("#rng").querySelectorAll("button").forEach(b=>{const y={"3M":.25,"6M":.5,"1Y":1,"3Y":3,"5Y":5,"10Y":10}[b.dataset.r];if(y&&y>yrsHist+0.5)b.hidden=true});
+  const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];if(r==="Auto"&&DATA.length>60){autoR();return}
+    const y={"3M":.25,"6M":.5,"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];
     if(r==="Max"||!y||y>=yrsHist){pc.timeScale().fitContent();return}
-    const d0=new Date(end);d0.setFullYear(d0.getFullYear()-y);let from=d0.toISOString().slice(0,10);if(from<t0)from=t0;
+    const d0=new Date(end);d0.setMonth(d0.getMonth()-Math.round(y*12));let from=d0.toISOString().slice(0,10);if(from<t0)from=t0;
     pc.timeScale().setVisibleRange({from,to:end})};
-  const r0=hasOHLC?(yrsHist>=1?"1Y":"Max"):(yrsHist>=5?"5Y":"Max");$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.r===r0));setR(r0);
+  // Auto: open on the candles needed for analysis - back to where today's levels formed, 60 to 160 candles
+  const autoR=()=>{const n=DATA.length,set=$("#lvset").value==="off"?"daily":$("#lvset").value;let s0=n-60;
+    try{const H=chains(set);[...(H.zones||[]),...(H.swings||[])].forEach(z=>{if(z.to===LV.as_of){const i=IDX[z.start];if(i!=null)s0=Math.min(s0,i-8)}})}catch(e){}
+    s0=Math.max(n-(innerWidth<700?110:160),Math.min(n-60,s0));pc.timeScale().setVisibleLogicalRange({from:s0,to:n+3})};
+  const r0=hasOHLC?(DATA.length>60?"Auto":"Max"):(yrsHist>=5?"5Y":"Max");$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.r===r0));setR(r0);
   if(S.focusSetup&&S.focusSetup.sym===sym){const f=S.focusSetup;S.focusSetup=null;const i=IDX[f.date];
-    if(i!=null){pc.timeScale().setVisibleLogicalRange({from:i-90,to:i+30});const x=SU.find(z=>z.date===f.date);
-      if(x){const ln=pl.createPriceLine({price:x.dir>0?x.lo:x.hi,color:x.dir>0?css("--good"):css("--bad"),lineWidth:2,lineStyle:0,axisLabelVisible:true,title:"Setup level"});
+    if(i!=null){pc.timeScale().setVisibleLogicalRange({from:i-(innerWidth<700?70:110),to:i+Math.min(25,DATA.length-1-i)+4});const x=SU.find(z=>z.date===f.date);
+      if(x){const ln=pl.createPriceLine({price:x.dir>0?x.lo:x.hi,color:x.dir>0?css("--good"):css("--bad"),lineWidth:2,lineStyle:0,axisLabelVisible:true,title:""});
         $("#ch-price").closest(".card").insertAdjacentHTML("afterbegin",`<div class="banner" style="margin-bottom:8px">${esc(f.date)}: ${esc(PATNAME[x.pattern])} · ${esc(x.level)} ${nf(x.lo,x.lo<100?2:0)}${x.hi!==x.lo?"–"+nf(x.hi,x.hi<100?2:0):""} · score ${x.score}</div>`)}}
     setTimeout(()=>$("#ch-price").scrollIntoView({block:"center"}),50)}
   $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b||!b.dataset.r)return;$("#rng").querySelectorAll("button[data-r]").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
@@ -736,6 +753,7 @@ async function viewSetups(){
     </div></details>
    <div class="row">
     <select id="su-day" aria-label="Days"><option value="1">Latest day (${esc(dates[0]||"")})</option><option value="5" selected>Last 5 trading days</option><option value="10">Last 10 trading days</option></select>
+    <select id="su-sort" aria-label="Sort"><option value="score">Highest score first</option><option value="date">Newest first</option></select>
     <label class="row" style="gap:4px"><input type="checkbox" id="su-below"> show those below my minimum score</label>
     <span class="note" id="su-n"></span>
    </div>
@@ -772,11 +790,12 @@ async function viewSetups(){
     ok.forEach(s=>{s._sc=suScore(s,R);(grp[s.pattern+"|"+s.kind]=grp[s.pattern+"|"+s.kind]||[]).push(s)});
     const stat={};Object.entries(grp).forEach(([k,ss])=>{const d=ss[0].dir,f=hz=>ss.filter(s=>s["r"+hz]!=null).map(s=>d*s["r"+hz]),hi=ss.filter(s=>s._sc>=R.min_score&&s.r10!=null).map(s=>d*s.r10);
       stat[k]={pattern:ss[0].pattern,kind:ss[0].kind,dir:d,n:ss.length,hit5:hit(f(5)),hit10:hit(f(10)),hit20:hit(f(20)),avg10:mean(f(10)),base10:bAvg("r10")==null?null:d*bAvg("r10"),hit10_hi:hit(hi),n10_hi:hi.length,avg10_hi:mean(hi)}});
-    const rows=D.recent.filter(r=>r.date>=from&&suPass(r,R,true)).map(r=>({...r,_sc:suScore(r,R)})).filter(r=>below||r._sc>=R.min_score).sort((a,b)=>a.date===b.date?b._sc-a._sc:a.date<b.date?1:-1);
+    const rows=D.recent.filter(r=>r.date>=from&&suPass(r,R,true)).map(r=>({...r,_sc:suScore(r,R)})).filter(r=>below||r._sc>=R.min_score).sort($("#su-sort").value==="date"?(a,b)=>a.date===b.date?b._sc-a._sc:a.date<b.date?1:-1:(a,b)=>b._sc-a._sc||(a.date<b.date?1:-1));
     $("#su-n").textContent=`${rows.length} setup${rows.length===1?"":"s"}`;
     $("#su-t").innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Company</th><th>Pattern</th><th class="hs">At level</th><th class="n">Score</th><th class="n hs">Volume</th><th class="n">Hit 10d</th></tr></thead><tbody>${rows.map(r=>{const st=stat[r.pattern+"|"+r.kind];return`<tr data-s="${esc(r.symbol)}" data-d="${esc(r.date)}" style="cursor:pointer${r._sc<R.min_score?";opacity:.55":""}"><td class="mono">${esc(r.date.slice(5))}</td><td>${nameCell(r)}</td><td>${pill(r)}<div class="note">${esc(r.level)}</div></td><td class="hs mono">${nf(r.lo,r.lo<100?2:0)}${r.hi!==r.lo?"–"+nf(r.hi,r.hi<100?2:0):""}</td><td class="n"><b>${r._sc}</b></td><td class="n hs">${r.vol==null?"–":r.vol.toFixed(1)+"x"}</td><td class="n" title="${st?st.n+" past signals":""}">${st?pct(st.hit10_hi??st.hit10):"–"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Hit 10d = how often past setups of the same pattern at the same kind of level, passing your rules, moved the expected way over 10 days.</p>`
       :`<div class="empty">No setups pass your rules in this window. Lower the minimum score, widen the tolerance or pick more days.</div>`;
-    $("#su-t").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>{S.focusSetup={sym:tr.dataset.s,date:tr.dataset.d};goCompany(tr.dataset.s)});
+    $("#su-t").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>{S.focusSetup={sym:tr.dataset.s,date:tr.dataset.d};
+      S.setupNav={list:rows.map(r=>({sym:r.symbol,date:r.date,sc:r._sc,pattern:r.pattern,dir:r.dir})),i:[...tr.parentNode.children].indexOf(tr)};goCompany(tr.dataset.s)});
     if(!A){$("#su-s").innerHTML='<div class="empty">The backtest with your rules appears after the next daily build.</div>';$("#su-head").innerHTML="";return}
     const pass=ok.filter(s=>s._sc>=R.min_score&&s.r10!=null),rel=pass.map(s=>s.dir*s.r10),bu=bUp("r10");
     const bh=pass.length?mean(pass.map(s=>s.dir>0?bu:1-bu)):null;
@@ -784,7 +803,7 @@ async function viewSetups(){
     const st=Object.values(stat).sort((a,b)=>((b.avg10??-1)-(b.base10??0))-((a.avg10??-1)-(a.base10??0)));
     $("#su-s").innerHTML=st.length?`<div class="tablewrap"><table><thead><tr><th>Pattern</th><th>At level</th><th class="n">Signals</th><th class="n">Hit 5d</th><th class="n">Hit 10d</th><th class="n hs">Hit 20d</th><th class="n">Avg 10d</th><th class="n hs">Base 10d</th><th class="n">Hit 10d, score ${R.min_score}+</th></tr></thead><tbody>${st.map(r=>{const bhit=bu==null?0.5:(r.dir>0?bu:1-bu),good=r.avg10!=null&&r.base10!=null&&r.avg10>r.base10&&r.hit10>bhit;return`<tr${r.n<30?' style="opacity:.6"':""}><td>${pill(r)}</td><td>${r.kind==="test"?(r.dir>0?"Held support":"Rejected at resistance"):(r.dir>0?"Broke resistance":"Broke support")}</td><td class="n">${r.n}</td><td class="n">${pct(r.hit5)}</td><td class="n"><b style="color:${good?"var(--good)":"inherit"}">${pct(r.hit10)}</b></td><td class="n hs">${pct(r.hit20)}</td><td class="n">${pc(r.avg10)}</td><td class="n hs">${pc(r.base10)}</td><td class="n">${r.n10_hi?pct(r.hit10_hi)+` <span class="note">(${r.n10_hi})</span>`:"–"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Green hit rate = beat both the base return and the base hit rate (${pct(bu)} of all 10-day periods rose). Faded rows have fewer than 30 signals. Past hit rates are a guide, not a forecast.</p>`:'<div class="empty">No past signals pass these rules.</div>';
   };
-  form();summ();$("#su-day").onchange=draw;$("#su-below").onchange=draw;draw();
+  form();summ();$("#su-day").onchange=draw;$("#su-below").onchange=draw;$("#su-sort").onchange=draw;draw();
 }
 async function viewNews(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
