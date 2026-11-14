@@ -6,7 +6,9 @@ the close of day t, for the backtest.
 """
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -22,6 +24,53 @@ PATTERNS = {
     "evening_star": ("Evening star", -1),
 }
 HORIZONS = (5, 10, 20)
+TOL_MAX = 0.5  # widest touch tolerance (in ATR) recorded; the rules pick a tighter one
+RULES_PATH = Path(__file__).resolve().parent.parent / "config" / "setup_rules.json"
+DEFAULT_RULES = {
+    "version": 1, "min_score": 60, "weights": {"level": 35, "pattern": 25, "volume": 25, "trend": 15},
+    "level_full_at": 0.6, "volume": {"floor": 0.7, "full": 2.0}, "tolerance_atr": 0.25, "direction": "both",
+    "patterns": {k: True for k in PATTERNS}, "kinds": {"test": True, "break": True},
+    "level_types": {"zone": True, "swing": True}, "alerts": {"enabled": False, "channels": {}},
+}
+
+
+def load_rules(path: Path = RULES_PATH) -> dict:
+    """Screening rules shared by the web app, the daily build and alerts (config/setup_rules.json)."""
+    r = json.loads(json.dumps(DEFAULT_RULES))
+    try:
+        user = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return r
+    for k, v in user.items():
+        r[k] = {**r[k], **v} if isinstance(v, dict) and isinstance(r.get(k), dict) else v
+    return r
+
+
+def score(s: dict, rules: dict) -> int:
+    """0-100 score from the setup's components and the rule weights. Mirrored in app/page.html (suScore)."""
+    w = rules["weights"]
+    tot = sum(max(0, float(w.get(k, 0))) for k in ("level", "pattern", "volume", "trend")) or 1
+    v = rules["volume"]
+    vol_s = 0.5 if s.get("vol") is None else max(0, min(1, (s["vol"] - v["floor"]) / max(1e-9, v["full"] - v["floor"])))
+    x = (max(0, w.get("level", 0)) * min(1, s["zs"] / max(1e-9, rules["level_full_at"]))
+         + max(0, w.get("pattern", 0)) * s["strength"]
+         + max(0, w.get("volume", 0)) * vol_s
+         + max(0, w.get("trend", 0)) * (1 if s["trend"] else 0))
+    return int(round(100 * x / tot))
+
+
+def matches(s: dict, rules: dict, min_score=None) -> bool:
+    """Does a setup pass the rules (pattern, kind, level type, direction, tolerance, minimum score)?"""
+    if not rules["patterns"].get(s["pattern"], True) or not rules["kinds"].get(s["kind"], True):
+        return False
+    if not rules["level_types"].get(s.get("lt", "zone"), True):
+        return False
+    d = rules.get("direction", "both")
+    if (d == "bull" and s["dir"] < 0) or (d == "bear" and s["dir"] > 0):
+        return False
+    if s.get("tol", 0) > rules["tolerance_atr"] + 1e-9:
+        return False
+    return score(s, rules) >= (rules["min_score"] if min_score is None else min_score)
 
 
 def _frame(prices: pd.DataFrame) -> pd.DataFrame:
@@ -79,7 +128,7 @@ def detect(d: pd.DataFrame, i: int) -> list[tuple[str, float, int]]:
 def _interaction(direction, lo, hi, prev_close, close, levels, atr):
     """Best level interaction for a pattern: (kind, label, level_lo, level_hi, level_score)."""
     zones, swings = levels
-    tol = 0.25 * atr
+    tol = TOL_MAX * atr
     best = None
     cands = [(z[0], z[1], z[3], 1 - math.exp(-z[2] / 7.163), "zone") for z in zones]
     cands += [(s[0], s[0], s[1], 0.25 if s[2] else 0.35, "swing") for s in swings]
@@ -88,28 +137,32 @@ def _interaction(direction, lo, hi, prev_close, close, levels, atr):
         if direction > 0:
             # support held: the pattern's low reached the level and the close stayed above its bottom
             if side <= 0 and lo <= zhi + tol and close >= zlo - tol and lo >= zlo - 2 * atr:
-                hit = ("test", f"Held support {name}", zlo, zhi, sc)
+                need = max(0.0, (lo - zhi) / atr, (zlo - close) / atr)
+                hit = ("test", f"Held support {name}", zlo, zhi, sc, need, what)
             # breakout: the close crossed above a resistance level
             elif side >= 0 and prev_close <= zhi and close > zhi:
-                hit = ("break", f"Broke above resistance {name}", zlo, zhi, sc)
+                hit = ("break", f"Broke above resistance {name}", zlo, zhi, sc, 0.0, what)
             else:
                 continue
         else:
             if side >= 0 and hi >= zlo - tol and close <= zhi + tol and hi <= zhi + 2 * atr:
-                hit = ("test", f"Rejected at resistance {name}", zlo, zhi, sc)
+                need = max(0.0, (zlo - hi) / atr, (close - zhi) / atr)
+                hit = ("test", f"Rejected at resistance {name}", zlo, zhi, sc, need, what)
             elif side <= 0 and prev_close >= zlo and close < zlo:
-                hit = ("break", f"Broke below support {name}", zlo, zhi, sc)
+                hit = ("break", f"Broke below support {name}", zlo, zhi, sc, 0.0, what)
             else:
                 continue
-        if best is None or hit[4] > best[4]:
+        # strongest level first; among equals, the closest touch
+        if best is None or (hit[4], -hit[5]) > (best[4], -best[5]):
             best = hit
     return best
 
 
-def find_setups(prices: pd.DataFrame, hist: dict) -> list[dict]:
+def find_setups(prices: pd.DataFrame, hist: dict, rules: dict | None = None) -> list[dict]:
     """All pattern-at-level setups over the level-history window, with forward returns where known."""
     if not hist or not hist.get("t"):
         return []
+    rules = rules or load_rules()
     d = _frame(prices)
     if len(d) < 40:
         return []
@@ -137,14 +190,11 @@ def find_setups(prices: pd.DataFrame, hist: dict) -> list[dict]:
             hit = _interaction(direction, lo, hi, float(closes[i - 1]), float(closes[i]), prev_lv, atr)
             if not hit:
                 continue
-            kind, label, zlo, zhi, zscore = hit
+            kind, label, zlo, zhi, zscore, need, what = hit
             vol_ratio = float(row["volume"] / row["vol20"]) if row["vol20"] and row["vol20"] > 0 else None
             trend_ok = (row["chg10"] < 0) if direction > 0 else (row["chg10"] > 0)
             if kind == "break":  # a breakout should go with the trend, a reversal against it
                 trend_ok = (row["close"] > row["sma20"]) if direction > 0 else (row["close"] < row["sma20"])
-            vol_s = 0.5 if vol_ratio is None else max(0, min(1, (vol_ratio - 0.7) / 1.3))
-            score = round(100 * (0.35 * min(1, zscore / 0.6) + 0.25 * strength + 0.25 * vol_s + 0.15 * (1 if trend_ok else 0)))
-            score = int(max(0, min(100, score)))
             fwd = {}
             for hz in HORIZONS:
                 if i + hz < len(closes):
@@ -152,7 +202,9 @@ def find_setups(prices: pd.DataFrame, hist: dict) -> list[dict]:
             out.append({"date": t, "pattern": key, "dir": direction, "kind": kind, "level": label,
                         "lo": round(zlo, 2), "hi": round(zhi, 2), "close": round(float(closes[i]), 2),
                         "strength": round(strength, 2), "vol": None if vol_ratio is None else round(vol_ratio, 2),
-                        "trend": bool(trend_ok), "score": score, "candles": n, **fwd})
+                        "trend": bool(trend_ok), "candles": n, "zs": round(zscore, 3), "tol": round(need, 2),
+                        "lt": what, **fwd})
+            out[-1]["score"] = score(out[-1], rules)
     return out
 
 
@@ -168,11 +220,15 @@ def baseline(prices: pd.DataFrame, start_date: str | None) -> dict:
     return out
 
 
-def summarize(all_setups: list[dict], base: dict) -> list[dict]:
-    """Backtest table: per pattern x level-kind, forward returns in the pattern's direction and hit rate."""
+def summarize(all_setups: list[dict], base: dict, rules: dict | None = None) -> list[dict]:
+    """Backtest table: per pattern x level-kind, forward returns in the pattern's direction and hit rate.
+    Signals outside the rules' tolerance / level types are left out; the *_hi columns are those passing the minimum score."""
+    rules = rules or load_rules()
     rows = []
     groups = {}
     for s in all_setups:
+        if s.get("tol", 0) > rules["tolerance_atr"] + 1e-9 or not rules["level_types"].get(s.get("lt", "zone"), True):
+            continue
         groups.setdefault((s["pattern"], s["kind"]), []).append(s)
         groups.setdefault((s["pattern"], "all"), []).append(s)
     for (pat, kind), ss in sorted(groups.items()):
@@ -188,7 +244,7 @@ def summarize(all_setups: list[dict], base: dict) -> list[dict]:
                 b = base.get(f"r{hz}") or []
                 if b:
                     row[f"base{hz}"] = round(float(np.mean(b)) * direction, 4)
-        hi_r = [direction * s["r10"] for s in ss if "r10" in s and s["score"] >= 60]
+        hi_r = [direction * s["r10"] for s in ss if "r10" in s and s["score"] >= rules["min_score"]]
         if hi_r:
             row["hit10_hi"] = round(float(np.mean([x > 0 for x in hi_r])), 3)
             row["n10_hi"] = len(hi_r)

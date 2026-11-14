@@ -11,7 +11,7 @@ on:
         default: daily
   push:
     branches: [main]
-    paths: ["data/screener_exports/**", "app/**", "pipeline/**"]
+    paths: ["data/screener_exports/**", "app/**", "pipeline/**", "config/**"]
 
 permissions:
   contents: write
@@ -49,6 +49,19 @@ jobs:
           echo "mode=$m" >> "$GITHUB_OUTPUT"
       - name: Run pipeline
         run: python pipeline/run.py ${{ steps.mode.outputs.mode }}
+      # Alerts: off until config/setup_rules.json has alerts.enabled and a channel switched on, and its secrets exist.
+      - name: Send setup alerts
+        continue-on-error: true
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+          WHATSAPP_TO: ${{ secrets.WHATSAPP_TO }}
+        run: python pipeline/alerts.py ${{ steps.mode.outputs.mode == 'daily' && '--send' || '' }}
       - name: Commit raw data history
         run: |
           git config user.name "data-bot"

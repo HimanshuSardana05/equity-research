@@ -21,7 +21,8 @@ from events import load_events
 from fundamentals import fiscal_years
 from prices import load_prices
 from levels import compute_levels_full, precompute, history_for
-from setups import find_setups, baseline, summarize, PATTERNS
+from setups import find_setups, baseline, summarize, load_rules, PATTERNS
+from alerts import build_alerts
 
 
 def _f(x):
@@ -279,6 +280,7 @@ def percentile(series, x):
 
 # --------------------------------------------------------------------------- main build
 _BASE = {"r5": [], "r10": [], "r20": []}
+RULES = load_rules()
 
 
 def _setups(sym, prices):
@@ -288,7 +290,7 @@ def _setups(sym, prices):
             b = baseline(prices, h["t"][0])
             for k in _BASE:
                 _BASE[k].extend(b[k])
-        return find_setups(prices, h)
+        return find_setups(prices, h, RULES)
     except Exception as e:
         print("setups fail", sym, repr(e))
         return []
@@ -624,12 +626,26 @@ def build_all(universe: list[dict]):
                                "verdict": c["verdict"]["label"], "coffee_can": c["coffee_can"]["status"]})
     recent.sort(key=lambda x: (x["date"], x["score"]), reverse=True)
     base_hit = {k: (float(np.mean([x > 0 for x in v])) if v else None) for k, v in _BASE.items()}
+    # every signal, compact, so the app can re-score and re-run the backtest with the viewer's own rules
+    syms = sorted(companies)
+    sidx = {s: i for i, s in enumerate(syms)}
+    pkeys = list(PATTERNS)
+    cols = ["s", "date", "p", "kind", "lt", "zs", "strength", "vol", "trend", "tol", "r5", "r10", "r20"]
+    rows = []
+    for sym in syms:
+        for st in companies[sym].get("setups", []):
+            rows.append([sidx[sym], st["date"], pkeys.index(st["pattern"]), 1 if st["kind"] == "break" else 0,
+                         1 if st.get("lt") == "swing" else 0, st.get("zs"), st["strength"], st.get("vol"),
+                         1 if st["trend"] else 0, st.get("tol", 0), st.get("r5"), st.get("r10"), st.get("r20")])
     write_json(SITE_DATA / "setups.json", {
         "as_of": dates[-1] if dates else None, "recent_from": recent_from, "recent": recent,
-        "stats": summarize(all_setups, _BASE), "base_up_rate": base_hit, "total": len(all_setups),
-        "window_from": dates[0] if dates else None,
-        "patterns": {k: v[0] for k, v in PATTERNS.items()},
+        "stats": summarize(all_setups, _BASE, RULES), "base_up_rate": base_hit, "total": len(all_setups),
+        "base_avg": {k: (float(np.mean(v)) if v else None) for k, v in _BASE.items()},
+        "window_from": dates[0] if dates else None, "rules": RULES,
+        "patterns": {k: v[0] for k, v in PATTERNS.items()}, "pattern_dir": {k: v[1] for k, v in PATTERNS.items()},
+        "all": {"syms": syms, "patterns": pkeys, "cols": cols, "rows": rows},
     })
+    write_json(SITE_DATA / "alerts.json", build_alerts(recent, RULES, dates[-1] if dates else None))
     write_json(SITE_DATA / "sectors.json", sectors)
     feed = []
     for sym, evs in events_by_sym.items():

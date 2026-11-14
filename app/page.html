@@ -452,9 +452,10 @@ async function viewCompany(sym){
   const rpRun=()=>{clearInterval(RP.timer);RP.timer=setInterval(()=>{if(!rpEl.isConnected){clearInterval(RP.timer);return}rpSet(RP.idx+1)},+$("#rp-speed").value)};
   $("#rp-play").onclick=()=>{if(RP.timer){rpStop();return}rpStart();if(RP.idx>=DATA.length-1)return;$("#rp-play").textContent="⏸";$("#rp-play").title="Pause";rpRun()};
   $("#rp-speed").onchange=()=>{if(RP.timer)rpRun()};
-  const SU=(c.setups||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  const SU0=(c.setups||[]).slice().sort((a,b)=>a.date<b.date?-1:1);let SU=SU0;
   const setMk=upto=>{try{pl.setMarkers(SU.filter(x=>!upto||x.date<=upto).map(x=>({time:x.date,position:x.dir>0?"belowBar":"aboveBar",color:x.dir>0?css("--good"):css("--bad"),shape:x.dir>0?"arrowUp":"arrowDown",text:innerWidth<700?"":PATSHORT[x.pattern]+(x.kind==="break"?" ↗":"")})))}catch(e){}};
   setMk();
+  suRules().then(R=>{SU=SU0.filter(x=>x.zs==null||suPass(x,R));if(RP.idx==null)setMk();else setMk(DATA[RP.idx].time)});
   const fsCard=$("#ch-price").closest(".card");
   const fsSet=on=>{fsCard.classList.toggle("fs",on);document.body.classList.toggle("fs-on",on);$("#fsbtn").textContent=on?"✕":"⤢";$("#fsbtn").title=on?"Exit full screen":"Full screen";redraw()};
   $("#fsbtn").onclick=async()=>{const on=!fsCard.classList.contains("fs");fsSet(on);
@@ -658,42 +659,97 @@ function scatter(xk,yk,ind,logY){
 const PATNAME={bull_engulf:"Bullish engulfing",bear_engulf:"Bearish engulfing",bull_harami:"Bullish harami",bear_harami:"Bearish harami",piercing:"Piercing line",dark_cloud:"Dark cloud cover",morning_star:"Morning star",evening_star:"Evening star"};
 const PATSHORT={bull_engulf:"Engulf",bear_engulf:"Engulf",bull_harami:"Harami",bear_harami:"Harami",piercing:"Pierce",dark_cloud:"DCC",morning_star:"M-star",evening_star:"E-star"};
 async function setupsData(){if(!S.setups)S.setups=getJSON("data/setups.json");return S.setups}
+/* Scoring rules: defaults from config/setup_rules.json (published as data/setup_rules.json), your changes saved on this device.
+   suScore/suPass mirror score()/matches() in pipeline/setups.py, so alerts and this screen agree. */
+const SU_KEY="his.setupRules";
+async function suBase(){if(!S.suBase)S.suBase=getJSON("data/setup_rules.json").catch(()=>({}));return S.suBase}
+function suMerge(a,b){const o=JSON.parse(JSON.stringify(a||{}));for(const[k,v]of Object.entries(b||{}))o[k]=v&&typeof v==="object"&&!Array.isArray(v)&&o[k]&&typeof o[k]==="object"?{...o[k],...v}:v;return o}
+function suMine(){try{return JSON.parse(localStorage.getItem(SU_KEY)||"null")}catch(e){return null}}
+async function suRules(){const b=suMerge({min_score:60,weights:{level:35,pattern:25,volume:25,trend:15},level_full_at:0.6,volume:{floor:0.7,full:2},tolerance_atr:0.25,direction:"both",patterns:{},kinds:{test:true,break:true},level_types:{zone:true,swing:true}},await suBase());return suMerge(b,suMine())}
+function suScore(s,R){const w=R.weights,c=k=>Math.max(0,+w[k]||0),tot=c("level")+c("pattern")+c("volume")+c("trend")||1,V=R.volume;
+  const vs=s.vol==null?0.5:Math.max(0,Math.min(1,(s.vol-V.floor)/Math.max(1e-9,V.full-V.floor)));
+  return Math.round(100*(c("level")*Math.min(1,(s.zs??0)/Math.max(1e-9,R.level_full_at))+c("pattern")*s.strength+c("volume")*vs+c("trend")*(s.trend?1:0))/tot)}
+function suPass(s,R,noScore){if(R.patterns[s.pattern]===false||R.kinds[s.kind]===false||R.level_types[s.lt||"zone"]===false)return false;
+  if((R.direction==="bull"&&s.dir<0)||(R.direction==="bear"&&s.dir>0))return false;if((s.tol||0)>R.tolerance_atr+1e-9)return false;
+  return noScore||suScore(s,R)>=R.min_score}
 async function viewSetups(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading setups…</div>';
   let D;try{D=await setupsData()}catch(e){v.innerHTML='<div class="empty">Setups appear after the next daily build.</div>';return}
+  let R=await suRules();
   if(location.hash!=="#setups")return;
-  const P=D.patterns||{},dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
-  const stat={};(D.stats||[]).forEach(r=>{stat[r.pattern+"|"+r.kind]=r});
+  const P=D.patterns||PATNAME,dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
+  const A=D.all?D.all.rows.map(r=>{const o={};D.all.cols.forEach((c,i)=>o[c]=r[i]);o.pattern=D.all.patterns[o.p];o.kind=o.kind?"break":"test";o.lt=o.lt?"swing":"zone";o.trend=!!o.trend;o.dir=(D.pattern_dir||{})[o.pattern]??(/^(bull|pier|morn)/.test(o.pattern)?1:-1);return o}):null;
+  const W=[["level","Level strength","How many times price has respected the level (full marks at the level score below)"],["pattern","Pattern quality","How clean the candle pattern is"],["volume","Volume","Signal-day volume vs its 20-day average"],["trend","Trend fit","Reversals after a move into the level; breakouts with the 20-day trend"]];
+  const KIND={test:"Level tests (support held / rejected at resistance)",break:"Breakouts and breakdowns"};
   v.innerHTML=`<div class="grid" style="gap:var(--s4)">
-   <div><h1>Setups: candle patterns at levels</h1><p class="muted" style="margin:4px 0 0">A pattern counts only when it forms at a level your LevelIndicator already showed the day before: bullish patterns holding support or breaking resistance, bearish ones rejected at resistance or breaking support. No lookahead.</p></div>
+   <div><h1>Setups: candle patterns at levels</h1><p class="muted" style="margin:4px 0 0">A pattern counts only when it forms at a level your LevelIndicator already showed the day before: bullish patterns holding support or breaking resistance, bearish ones rejected at resistance or breaking support. No lookahead. Your scoring rules below decide what shows, how it is scored and what the backtest measures.</p></div>
+   <details class="card" id="su-rules"><summary style="cursor:pointer;font-weight:600"><span>Your scoring rules</span> <span class="note" id="su-sum" style="font-weight:400"></span></summary>
+    <div class="grid" style="gap:14px;margin-top:12px">
+     <label class="row" style="gap:10px;flex-wrap:wrap"><b style="min-width:150px">Minimum score</b><input type="range" id="r-min" min="0" max="100" step="5" style="flex:1;min-width:160px"><b class="mono" id="r-minv" style="min-width:32px;text-align:right"></b></label>
+     <div><b>Score weights</b> <span class="note">relative, scaled so the total score is out of 100</span>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:6px">${W.map(([k,l,h])=>`<label title="${esc(h)}" style="display:flex;flex-direction:column;gap:2px"><span>${l} <b class="mono" id="r-w-${k}v"></b></span><input type="range" min="0" max="100" step="5" id="r-w-${k}"><span class="note">${esc(h)}</span></label>`).join("")}</div></div>
+     <div class="row" style="gap:16px;flex-wrap:wrap">
+      <label class="row" style="gap:6px">Touch tolerance <select id="r-tol">${[0.1,0.15,0.25,0.35,0.5].map(x=>`<option value="${x}">${x} ATR</option>`).join("")}</select></label>
+      <label class="row" style="gap:6px">Level score for full marks <select id="r-full">${[0.3,0.45,0.6,0.75,0.9].map(x=>`<option value="${x}">${x}</option>`).join("")}</select></label>
+      <label class="row" style="gap:6px">Volume for full marks <select id="r-vol">${[1.5,2,2.5,3].map(x=>`<option value="${x}">${x}x average</option>`).join("")}</select></label>
+      <label class="row" style="gap:6px">Direction <select id="r-dir"><option value="both">Bullish and bearish</option><option value="bull">Bullish only</option><option value="bear">Bearish only</option></select></label></div>
+     <div><b>Patterns</b><div class="row" style="flex-wrap:wrap;gap:4px 14px;margin-top:4px">${Object.keys(P).map(k=>`<label class="row" style="gap:4px"><input type="checkbox" data-rp="${k}">${esc(P[k])}</label>`).join("")}</div></div>
+     <div class="row" style="flex-wrap:wrap;gap:4px 14px"><b>Level interaction</b>${Object.entries(KIND).map(([k,l])=>`<label class="row" style="gap:4px"><input type="checkbox" data-rk="${k}">${l}</label>`).join("")}
+      <b style="margin-left:8px">Level types</b><label class="row" style="gap:4px"><input type="checkbox" data-rl="zone">Zones</label><label class="row" style="gap:4px"><input type="checkbox" data-rl="swing">Swing highs / lows</label></div>
+     <div class="row" style="gap:8px;flex-wrap:wrap"><button id="r-reset">Reset to defaults</button><button id="r-export">Download rules for alerts</button><span class="note" id="r-state"></span></div>
+     <p class="note" style="margin:0">Touch tolerance is how far (in daily ATR) a candle may stop short of the level and still count as testing it. Rules are saved on this device. Alerts will use the rules file in the project, so when you are happy with these, download them and replace <span class="mono">config/setup_rules.json</span> (or ask Claude to).</p>
+    </div></details>
    <div class="row">
-    <select id="su-dir" aria-label="Direction"><option value="">Bullish and bearish</option><option value="1">Bullish only</option><option value="-1">Bearish only</option></select>
-    <select id="su-pat" aria-label="Pattern"><option value="">All patterns</option>${Object.entries(P).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select>
-    <select id="su-kind" aria-label="Level interaction"><option value="">Tests and breaks</option><option value="test">Level tests (hold / rejection)</option><option value="break">Breakouts / breakdowns</option></select>
-    <select id="su-score" aria-label="Minimum score"><option value="0">Any score</option><option value="40">Score 40+</option><option value="60" selected>Score 60+</option></select>
     <select id="su-day" aria-label="Days"><option value="1">Latest day (${esc(dates[0]||"")})</option><option value="5" selected>Last 5 trading days</option><option value="10">Last 10 trading days</option></select>
+    <label class="row" style="gap:4px"><input type="checkbox" id="su-below"> show those below my minimum score</label>
     <span class="note" id="su-n"></span>
    </div>
    <div id="su-t"></div>
-   <div class="card"><h3>Backtest: which pattern + level combinations worked</h3>
-    <p class="note" style="margin-top:0">Every setup over the last two years across the Nifty 500 (${nf(D.total||0,0)} signals since ${esc(D.window_from||"")}). Returns are measured in the pattern's direction from the signal day's close, so a positive number means the move went the expected way. "Base" is the same measure on every day, so a combo is only useful if it beats its base. Fewer than 30 signals is too few to trust.</p>
-    <div id="su-s"></div></div>
+   <div class="card"><h3>Backtest with your rules</h3>
+    <p class="note" style="margin-top:0">Every setup over the last two years across the Nifty 500 (${nf(D.total||0,0)} signals since ${esc(D.window_from||"")}), filtered by your patterns, level types and tolerance. Returns are measured in the pattern's direction from the signal day's close, so a positive number means the move went the expected way. "Base" is the same measure on every day, so a combination is only useful if it beats its base. Fewer than 30 signals is too few to trust.</p>
+    <div id="su-head"></div><div id="su-s"></div></div>
   </div>`;
-  const pill=(r)=>`<span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(P[r.pattern]||r.pattern)}</span>`;
-  const pc=x=>x==null?"–":(x>0?"+":"")+(x*100).toFixed(1)+"%";
+  const pill=r=>`<span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(P[r.pattern]||r.pattern)}</span>`;
+  const pc=x=>x==null?"–":(x>0?"+":"")+(x*100).toFixed(1)+"%",pct=x=>x==null?"–":(x*100).toFixed(0)+"%";
+  const bAvg=k=>(D.base_avg||{})[k],bUp=k=>(D.base_up_rate||{})[k];
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null,hit=a=>a.length?a.filter(x=>x>0).length/a.length:null;
+  // ---------- rules form
+  const form=()=>{$("#r-min").value=R.min_score;$("#r-minv").textContent=R.min_score;W.forEach(([k])=>{$("#r-w-"+k).value=R.weights[k]??0;$("#r-w-"+k+"v").textContent=R.weights[k]??0});
+    $("#r-tol").value=String(R.tolerance_atr);$("#r-full").value=String(R.level_full_at);$("#r-vol").value=String(R.volume.full);$("#r-dir").value=R.direction||"both";
+    v.querySelectorAll("[data-rp]").forEach(x=>x.checked=R.patterns[x.dataset.rp]!==false);v.querySelectorAll("[data-rk]").forEach(x=>x.checked=R.kinds[x.dataset.rk]!==false);v.querySelectorAll("[data-rl]").forEach(x=>x.checked=R.level_types[x.dataset.rl]!==false)};
+  const summ=()=>{const w=R.weights,off=Object.keys(P).filter(k=>R.patterns[k]===false).length;
+    $("#su-sum").textContent=`· min ${R.min_score} · weights ${["level","pattern","volume","trend"].map(k=>w[k]??0).join("/")} · tolerance ${R.tolerance_atr} ATR${off?` · ${off} pattern${off>1?"s":""} off`:""}${R.direction!=="both"?" · "+R.direction+"ish only":""}`;
+    const mine=suMine();$("#r-state").textContent=mine?"Your rules, saved on this device.":"Using the project defaults."};
+  const read=()=>{const o={min_score:+$("#r-min").value,weights:{},tolerance_atr:+$("#r-tol").value,level_full_at:+$("#r-full").value,volume:{...R.volume,full:+$("#r-vol").value},direction:$("#r-dir").value,patterns:{},kinds:{},level_types:{}};
+    W.forEach(([k])=>o.weights[k]=+$("#r-w-"+k).value);v.querySelectorAll("[data-rp]").forEach(x=>o.patterns[x.dataset.rp]=x.checked);v.querySelectorAll("[data-rk]").forEach(x=>o.kinds[x.dataset.rk]=x.checked);v.querySelectorAll("[data-rl]").forEach(x=>o.level_types[x.dataset.rl]=x.checked);return o};
+  let tmr;const changed=()=>{const o=read();R=suMerge(R,o);$("#r-minv").textContent=o.min_score;W.forEach(([k])=>$("#r-w-"+k+"v").textContent=o.weights[k]);
+    try{localStorage.setItem(SU_KEY,JSON.stringify(o))}catch(e){}summ();clearTimeout(tmr);tmr=setTimeout(draw,60)};
+  $("#su-rules").addEventListener("input",e=>{if(e.target.matches("input,select"))changed()});
+  $("#r-reset").onclick=async()=>{try{localStorage.removeItem(SU_KEY)}catch(e){}R=await suRules();form();summ();draw()};
+  $("#r-export").onclick=async()=>{const b=await suBase(),{patterns,kinds,level_types,weights,volume,...rest}=read();
+    const out=suMerge(b,{...rest,weights,volume,patterns,kinds,level_types});const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)+"\n"],{type:"application/json"}));a.download="setup_rules.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+  // ---------- tables
   const draw=()=>{
-    const dir=$("#su-dir").value,pat=$("#su-pat").value,kind=$("#su-kind").value,min=+$("#su-score").value,nd=+$("#su-day").value;
-    const from=dates[Math.min(nd,dates.length)-1]||"";
-    const rows=D.recent.filter(r=>r.date>=from&&(!dir||r.dir==+dir)&&(!pat||r.pattern===pat)&&(!kind||r.kind===kind)&&r.score>=min);
+    const nd=+$("#su-day").value,from=dates[Math.min(nd,dates.length)-1]||"",below=$("#su-below").checked;
+    // backtest with the rules
+    const ok=A?A.filter(s=>suPass(s,R,true)):[];const grp={};
+    ok.forEach(s=>{s._sc=suScore(s,R);(grp[s.pattern+"|"+s.kind]=grp[s.pattern+"|"+s.kind]||[]).push(s)});
+    const stat={};Object.entries(grp).forEach(([k,ss])=>{const d=ss[0].dir,f=hz=>ss.filter(s=>s["r"+hz]!=null).map(s=>d*s["r"+hz]),hi=ss.filter(s=>s._sc>=R.min_score&&s.r10!=null).map(s=>d*s.r10);
+      stat[k]={pattern:ss[0].pattern,kind:ss[0].kind,dir:d,n:ss.length,hit5:hit(f(5)),hit10:hit(f(10)),hit20:hit(f(20)),avg10:mean(f(10)),base10:bAvg("r10")==null?null:d*bAvg("r10"),hit10_hi:hit(hi),n10_hi:hi.length,avg10_hi:mean(hi)}});
+    const rows=D.recent.filter(r=>r.date>=from&&suPass(r,R,true)).map(r=>({...r,_sc:suScore(r,R)})).filter(r=>below||r._sc>=R.min_score).sort((a,b)=>a.date===b.date?b._sc-a._sc:a.date<b.date?1:-1);
     $("#su-n").textContent=`${rows.length} setup${rows.length===1?"":"s"}`;
-    $("#su-t").innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Company</th><th>Pattern</th><th class="hs">At level</th><th class="n">Score</th><th class="n hs">Volume</th><th class="n">Hit 10d</th></tr></thead><tbody>${rows.map(r=>{const st=stat[r.pattern+"|"+r.kind];return`<tr data-s="${esc(r.symbol)}" data-d="${esc(r.date)}" style="cursor:pointer"><td class="mono">${esc(r.date.slice(5))}</td><td>${nameCell(r)}</td><td>${pill(r)}<div class="note">${esc(r.level)}</div></td><td class="hs mono">${nf(r.lo,r.lo<100?2:0)}${r.hi!==r.lo?"–"+nf(r.hi,r.hi<100?2:0):""}</td><td class="n"><b>${r.score}</b></td><td class="n hs">${r.vol==null?"–":r.vol.toFixed(1)+"x"}</td><td class="n" title="${st?st.n10+" past signals":""}">${st&&st.hit10!=null?(st.hit10*100).toFixed(0)+"%":"–"}</td></tr>`}).join("")}</tbody></table></div>`
-      :`<div class="empty">No setups match these filters. Try a lower score or more days.</div>`;
+    $("#su-t").innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Company</th><th>Pattern</th><th class="hs">At level</th><th class="n">Score</th><th class="n hs">Volume</th><th class="n">Hit 10d</th></tr></thead><tbody>${rows.map(r=>{const st=stat[r.pattern+"|"+r.kind];return`<tr data-s="${esc(r.symbol)}" data-d="${esc(r.date)}" style="cursor:pointer${r._sc<R.min_score?";opacity:.55":""}"><td class="mono">${esc(r.date.slice(5))}</td><td>${nameCell(r)}</td><td>${pill(r)}<div class="note">${esc(r.level)}</div></td><td class="hs mono">${nf(r.lo,r.lo<100?2:0)}${r.hi!==r.lo?"–"+nf(r.hi,r.hi<100?2:0):""}</td><td class="n"><b>${r._sc}</b></td><td class="n hs">${r.vol==null?"–":r.vol.toFixed(1)+"x"}</td><td class="n" title="${st?st.n+" past signals":""}">${st?pct(st.hit10_hi??st.hit10):"–"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Hit 10d = how often past setups of the same pattern at the same kind of level, passing your rules, moved the expected way over 10 days.</p>`
+      :`<div class="empty">No setups pass your rules in this window. Lower the minimum score, widen the tolerance or pick more days.</div>`;
     $("#su-t").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>{S.focusSetup={sym:tr.dataset.s,date:tr.dataset.d};goCompany(tr.dataset.s)});
-    const st=(D.stats||[]).filter(r=>r.kind!=="all"&&(!dir||r.dir==+dir)&&(!pat||r.pattern===pat)&&(!kind||r.kind===kind)).sort((a,b)=>((b.avg10??-1)-(b.base10??0))-((a.avg10??-1)-(a.base10??0)));
-    const bh=k=>D.base_up_rate&&D.base_up_rate[k]!=null?D.base_up_rate[k]:null;
-    $("#su-s").innerHTML=st.length?`<div class="tablewrap"><table><thead><tr><th>Pattern</th><th>At level</th><th class="n">Signals</th><th class="n">Hit 5d</th><th class="n">Hit 10d</th><th class="n hs">Hit 20d</th><th class="n">Avg 10d</th><th class="n hs">Base 10d</th><th class="n hs">Hit 10d, score 60+</th></tr></thead><tbody>${st.map(r=>{const b10=bh("r10"),bhit=b10==null?null:(r.dir>0?b10:1-b10);const good=r.avg10!=null&&r.base10!=null&&r.avg10>r.base10&&r.hit10>(bhit??0.5);return`<tr${r.n<30?' style="opacity:.6"':""}><td>${pill(r)}</td><td>${r.kind==="test"?(r.dir>0?"Held support":"Rejected at resistance"):(r.dir>0?"Broke resistance":"Broke support")}</td><td class="n">${r.n}</td><td class="n">${r.hit5==null?"–":(r.hit5*100).toFixed(0)+"%"}</td><td class="n"><b style="color:${good?"var(--good)":"inherit"}">${r.hit10==null?"–":(r.hit10*100).toFixed(0)+"%"}</b></td><td class="n hs">${r.hit20==null?"–":(r.hit20*100).toFixed(0)+"%"}</td><td class="n">${pc(r.avg10)}</td><td class="n hs">${pc(r.base10)}</td><td class="n hs">${r.hit10_hi==null?"–":(r.hit10_hi*100).toFixed(0)+"% ("+r.n10_hi+")"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Green hit rate = beat both the base return and the base hit rate (${bh("r10")==null?"–":(bh("r10")*100).toFixed(0)}% of all 10-day periods rose). Faded rows have fewer than 30 signals. Past hit rates are a guide, not a forecast.</p>`:"";
+    if(!A){$("#su-s").innerHTML='<div class="empty">The backtest with your rules appears after the next daily build.</div>';$("#su-head").innerHTML="";return}
+    const pass=ok.filter(s=>s._sc>=R.min_score&&s.r10!=null),rel=pass.map(s=>s.dir*s.r10),bu=bUp("r10");
+    const bh=pass.length?mean(pass.map(s=>s.dir>0?bu:1-bu)):null;
+    $("#su-head").innerHTML=`<div class="row" style="gap:24px;flex-wrap:wrap;margin:4px 0 12px"><div><div class="note">Signals passing your rules</div><b style="font-size:20px">${nf(pass.length,0)}</b></div><div><div class="note">Hit rate, 10 days</div><b style="font-size:20px;color:${bh!=null&&hit(rel)>bh?"var(--good)":"inherit"}">${pct(hit(rel))}</b> <span class="note">vs ${pct(bh)} base</span></div><div><div class="note">Average move, 10 days</div><b style="font-size:20px">${pc(mean(rel))}</b></div></div>`;
+    const st=Object.values(stat).sort((a,b)=>((b.avg10??-1)-(b.base10??0))-((a.avg10??-1)-(a.base10??0)));
+    $("#su-s").innerHTML=st.length?`<div class="tablewrap"><table><thead><tr><th>Pattern</th><th>At level</th><th class="n">Signals</th><th class="n">Hit 5d</th><th class="n">Hit 10d</th><th class="n hs">Hit 20d</th><th class="n">Avg 10d</th><th class="n hs">Base 10d</th><th class="n">Hit 10d, score ${R.min_score}+</th></tr></thead><tbody>${st.map(r=>{const bhit=bu==null?0.5:(r.dir>0?bu:1-bu),good=r.avg10!=null&&r.base10!=null&&r.avg10>r.base10&&r.hit10>bhit;return`<tr${r.n<30?' style="opacity:.6"':""}><td>${pill(r)}</td><td>${r.kind==="test"?(r.dir>0?"Held support":"Rejected at resistance"):(r.dir>0?"Broke resistance":"Broke support")}</td><td class="n">${r.n}</td><td class="n">${pct(r.hit5)}</td><td class="n"><b style="color:${good?"var(--good)":"inherit"}">${pct(r.hit10)}</b></td><td class="n hs">${pct(r.hit20)}</td><td class="n">${pc(r.avg10)}</td><td class="n hs">${pc(r.base10)}</td><td class="n">${r.n10_hi?pct(r.hit10_hi)+` <span class="note">(${r.n10_hi})</span>`:"–"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Green hit rate = beat both the base return and the base hit rate (${pct(bu)} of all 10-day periods rose). Faded rows have fewer than 30 signals. Past hit rates are a guide, not a forecast.</p>`:'<div class="empty">No past signals pass these rules.</div>';
   };
-  ["su-dir","su-pat","su-kind","su-score","su-day"].forEach(id=>$("#"+id).onchange=draw);draw();
+  form();summ();$("#su-day").onchange=draw;$("#su-below").onchange=draw;draw();
 }
 async function viewNews(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
