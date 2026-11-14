@@ -77,7 +77,7 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .zlayer{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}.ztags{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}.chart>.tv-lightweight-charts{position:relative;z-index:1}
 .sunav{position:absolute;top:6px;left:6px;z-index:5;display:flex;align-items:center;gap:4px;padding:3px;border-radius:999px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 90%,transparent);font-size:12px;max-width:calc(100% - 80px)}
 .sunav button{min-width:38px;height:34px;border-radius:999px;font-size:20px;font-weight:700;line-height:1;padding:0 8px}.sunav button:disabled{opacity:.35}
-.sunav .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.sunav .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;color:var(--ink)}.sunav .sym{font-family:var(--f-mono);font-weight:700;color:var(--ink)}.sunav>.t.sym{padding:6px 10px}
 .zone{position:absolute;left:0;border-block:2px solid}
 .zone span{position:absolute;left:6px;font-size:11px;font-weight:600;font-family:var(--f-mono);white-space:nowrap;color:#fff;padding:1px 6px;border-radius:4px}
 .z-res{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:var(--bad)}.z-res span{background:var(--bad)}
@@ -396,7 +396,6 @@ async function viewCompany(sym){
 
   // price chart
   const pc=mkChart($("#ch-price"));pc.timeScale().applyOptions({fixRightEdge:false,rightOffset:4});
-  pc.applyOptions({watermark:{visible:true,text:innerWidth<700?sym:`${sym} · ${c.name||""}`,fontSize:11,fontFamily:"IBM Plex Mono, monospace",color:css("--muted"),horzAlign:"right",vertAlign:"bottom"}});
   const P=c.price,hasOHLC=P.o&&P.o.some(x=>x!=null);let pl,DATA=[];const RP={on:false,idx:null,picking:false,timer:null};
   if(hasOHLC){
     pl=pc.addCandlestickSeries({upColor:css("--up"),downColor:css("--down"),borderVisible:true,borderUpColor:css("--up"),borderDownColor:css("--down"),wickUpColor:css("--up"),wickDownColor:css("--down")});
@@ -501,12 +500,12 @@ async function viewCompany(sym){
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&fsOpen()&&document.body.contains(fsCard))fsExit()});
   document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&nativeFs&&fsOpen()&&document.body.contains(fsCard)){nativeFs=false;fsExit()}});
   if(S.keepFs){S.keepFs=false;fsSet(true)}
-  {const navEl=document.createElement("div");navEl.className="sunav";navEl.hidden=true;$("#ch-price").appendChild(navEl);
+  {const navEl=document.createElement("div");navEl.className="sunav";navEl.innerHTML=`<span class="t sym">${esc(sym)}</span>`;navEl.title=c.name||sym;$("#ch-price").appendChild(navEl);
    (async()=>{let N=S.setupNav;
      if(!N||!N.list.some(x=>x.sym===sym)){try{const D=await setupsData(),R=await suRules();
        N={list:D.recent.filter(r=>r.date===D.as_of&&suPass(r,R)).map(r=>({sym:r.symbol,date:r.date,sc:suScore(r,R),pattern:r.pattern,dir:r.dir})).sort((a,b)=>b.sc-a.sc),i:0}}catch(e){return}}
      let i=N.list[N.i]&&N.list[N.i].sym===sym?N.i:N.list.findIndex(x=>x.sym===sym);if(i<0||!navEl.isConnected)return;N.i=i;S.setupNav=N;const it=N.list[i];
-     navEl.innerHTML=`<button data-d="-1" aria-label="Previous setup" title="Previous setup"${i===0?" disabled":""}>‹</button><span class="t"><b>${i+1} / ${N.list.length}</b> · <span style="color:var(${it.dir>0?"--good":"--bad"})">${it.dir>0?"▲":"▼"} ${esc(PATSHORT[it.pattern]||"")}</span> · ${it.sc}</span><button data-d="1" aria-label="Next setup" title="Next setup"${i===N.list.length-1?" disabled":""}>›</button>`;navEl.hidden=false;
+     navEl.innerHTML=`<button data-d="-1" aria-label="Previous setup" title="Previous setup"${i===0?" disabled":""}>‹</button><span class="t"><b class="sym">${esc(sym)}</b> · ${i+1}/${N.list.length} · <span style="color:var(${it.dir>0?"--good":"--bad"})">${it.dir>0?"▲":"▼"} ${esc(PATSHORT[it.pattern]||"")}</span> · ${it.sc}</span><button data-d="1" aria-label="Next setup" title="Next setup"${i===N.list.length-1?" disabled":""}>›</button>`;navEl.hidden=false;
      navEl.onclick=e=>{const b=e.target.closest("button[data-d]");if(!b||b.disabled)return;const j=i+(+b.dataset.d),n=N.list[j];N.i=j;S.focusSetup={sym:n.sym,date:n.date};S.keepFs=fsOpen();
        if(fsOpen())fsSet(false);goCompany(n.sym)}})()}
   const t0=c.price.t[0]||"",yrsHist=c.price.t.length?(new Date(c.price.t[c.price.t.length-1])-new Date(t0))/3.156e10:0;
