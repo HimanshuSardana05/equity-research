@@ -1,0 +1,552 @@
+<title>Nifty 500 Research Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: a research terminal. Sticky masthead with tabs, then one working view at a time;
+   cards only where a block is a separate instrument (chart, verdict, checklist). */
+:root{
+  --bg:#f5f7fa; --panel:#ffffff; --ink:#14202e; --muted:#5b6b7d; --line:#dfe5ec; --soft:#eef2f7;
+  --accent:#1d5fd1; --accent-ink:#ffffff;
+  --good:#127a4b; --good-bg:#e3f4ec; --bad:#b4372d; --bad-bg:#fbe9e7; --warn:#9a6400; --warn-bg:#fdf1db;
+  --chart-grid:#edf1f5;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
+  --accent:#6aa1ff; --accent-ink:#0b1220;
+  --good:#4cc38a; --good-bg:#12301f; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
+  --chart-grid:#1c2633; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
+  --accent:#6aa1ff; --accent-ink:#0b1220;
+  --good:#4cc38a; --good-bg:#12301f; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
+  --chart-grid:#1c2633; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;margin:0 auto}
+header.mast{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.mast .wrap{display:flex;align-items:center;gap:var(--s4);flex-wrap:wrap;padding-block:10px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.01em;white-space:nowrap}
+.brand small{font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);margin-left:6px}
+nav.tabs{display:flex;gap:2px;flex-wrap:wrap}
+nav.tabs a{padding:6px 12px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500}
+nav.tabs a:hover{background:var(--soft);color:var(--ink)}
+nav.tabs a.on{background:var(--accent);color:var(--accent-ink)}
+.search{margin-left:auto;position:relative;min-width:0;flex:0 1 280px}
+.search input{width:100%}
+input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button{cursor:pointer}
+button:hover{background:var(--soft)}
+button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sugg{position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;margin-top:4px;max-height:320px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:20}
+.sugg div{padding:6px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.sugg div:hover,.sugg div.hl{background:var(--soft)}
+.sugg span{color:var(--muted);font-size:12px}
+main{padding-block:var(--s5)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:26px;font-weight:700}
+h2{font-size:18px;font-weight:600}
+h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono,td.n,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.grid{display:grid;gap:var(--s4)}
+.grid>*{min-width:0}
+.kpis{min-width:0}
+.g2{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.g2e{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.g2,.g2e,.g3{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:var(--s4);min-width:0}
+.card > h3{margin-bottom:var(--s3)}
+.row{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.chart{height:340px;width:100%}
+.chart.sm{height:240px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.p-good{background:var(--good-bg);color:var(--good)}
+.p-bad{background:var(--bad-bg);color:var(--bad)}
+.p-warn{background:var(--warn-bg);color:var(--warn)}
+.p-neutral{background:var(--soft);color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--s3)}
+.kpi{border-left:2px solid var(--line);padding-left:10px}
+.kpi b{display:block;font-family:var(--f-mono);font-size:17px;font-weight:500}
+.kpi span{font-size:12px;color:var(--muted)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--soft);font-weight:600;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+th.n,td.n{text-align:right}
+tbody tr:hover{background:var(--soft)}
+tbody tr.click{cursor:pointer}
+td .nm{font-weight:500}
+td .sy{color:var(--muted);font-size:11px;font-family:var(--f-mono)}
+.reasons{margin:0;padding-left:18px;display:grid;gap:8px}
+.check{display:flex;justify-content:space-between;gap:var(--s3);padding:6px 0;border-bottom:1px dashed var(--line)}
+.check:last-child{border-bottom:0}
+.ccgrid{display:grid;grid-template-columns:auto repeat(var(--n),minmax(38px,1fr));gap:2px;font-size:12px;overflow-x:auto}
+.ccgrid div{padding:4px;text-align:center;border-radius:4px}
+.ccgrid .lab{text-align:left;color:var(--muted)}
+.ok{background:var(--good-bg);color:var(--good)} .no{background:var(--bad-bg);color:var(--bad)} .na{background:var(--soft);color:var(--muted)}
+.bar{height:10px;border-radius:5px;background:var(--soft);position:relative;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;background:var(--accent)}
+.bar i.neg{background:var(--bad)}
+.legend{display:flex;gap:var(--s3);flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.note{font-size:12px;color:var(--muted)}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:var(--r);padding:10px 14px;font-size:13px}
+.fv{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);text-align:center}
+.fv div{background:var(--soft);border-radius:6px;padding:8px}
+.fv b{display:block;font-family:var(--f-mono);font-size:16px}
+.feed{display:grid;gap:0}
+.feed .it{padding:10px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:110px minmax(0,1fr);gap:var(--s3)}
+.feed .it a{color:var(--accent)}
+.scatter{position:relative;height:520px}
+.scatter canvas{width:100%;height:100%;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.15);display:none;z-index:3}
+.prose{max-width:70ch}
+.prose p,.prose li{line-height:1.65}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:var(--s6)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="mast"><div class="wrap">
+  <div class="brand">Nifty 500 Research Desk<small id="asof">loading…</small></div>
+  <nav class="tabs" id="tabs">
+    <a href="#screen" data-v="screen">Screen</a>
+    <a href="#company" data-v="company">Company</a>
+    <a href="#sector" data-v="sector">Sector peers</a>
+    <a href="#factors" data-v="factors">Factor vs factor</a>
+    <a href="#news" data-v="news">Announcements</a>
+    <a href="#method" data-v="method">Method</a>
+  </nav>
+  <div class="search"><input id="q" placeholder="Search company or symbol" autocomplete="off" aria-label="Search company"><div class="sugg" id="sugg" hidden></div></div>
+</div></header>
+
+<main class="wrap" id="view"><div class="empty">Loading Nifty 500 data…</div></main>
+<footer class="wrap">Research tool for personal use. It is not investment advice. Data: NSE public archives and RSS feeds, Yahoo Finance, and your own Screener.in exports. Figures can be wrong or late; check filings before acting.</footer>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+"use strict";
+const $=(s,el=document)=>el.querySelector(s);
+const S={summary:[],sectors:{},meta:{},universe:[],cache:{},charts:[]};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const PAL=["#2f6fe0","#d9822b","#14a37f","#c4458a","#7a5cd6","#8a9a2a","#d24c3f","#2a9bc4","#6b7d8f","#b07d2a"];
+
+/* ---------- formatting ---------- */
+const nf=(x,d=1)=>x==null||!isFinite(x)?"–":Number(x).toLocaleString("en-IN",{maximumFractionDigits:d,minimumFractionDigits:d});
+const pct=(x,d=1)=>x==null||!isFinite(x)?"–":(x*100).toFixed(d)+"%";
+const sx=(x,d=1)=>x==null||!isFinite(x)?"–":Number(x).toFixed(d)+"x";
+const cr=x=>{if(x==null||!isFinite(x))return"–";const a=Math.abs(x);if(a>=1e5)return"₹"+(x/1e5).toFixed(2)+" L cr";if(a>=1e3)return"₹"+(x/1e3).toFixed(1)+"k cr";return"₹"+x.toFixed(0)+" cr"};
+const rs=x=>x==null||!isFinite(x)?"–":"₹"+nf(x,x<100?2:0);
+const FACT={
+  pe:{l:"PE (TTM)",f:x=>sx(x)}, pb:{l:"Price / Book",f:x=>sx(x)}, ev_ebitda:{l:"EV / EBITDA",f:x=>sx(x)},
+  roce:{l:"ROCE",f:pct}, roe:{l:"ROE",f:pct}, opm:{l:"Operating margin",f:pct}, npm:{l:"Net margin",f:pct},
+  de:{l:"Debt / Equity",f:x=>sx(x,2)}, rev_cagr3:{l:"Revenue CAGR 3y",f:pct}, ni_cagr3:{l:"Profit CAGR 3y",f:pct},
+  rev_growth:{l:"Revenue growth (last FY)",f:pct}, fcf_yield:{l:"FCF yield",f:pct}, div_yield:{l:"Dividend yield",f:pct},
+  ret_1y:{l:"Return 1y",f:pct}, ret_3y:{l:"Return 3y",f:pct}, implied_growth:{l:"Price-implied growth",f:pct},
+  expected_growth:{l:"Expected growth",f:pct}, upside:{l:"Upside to DCF base",f:pct}, pe_pct:{l:"PE vs own history (pctile)",f:x=>x==null?"–":(x*100).toFixed(0)},
+  mcap:{l:"Market cap",f:cr}, ey:{l:"Earnings yield",f:pct}, asset_turnover:{l:"Asset turnover",f:x=>sx(x,2)}, leverage:{l:"Assets / Equity",f:x=>sx(x,1)},
+};
+function verdictPill(v){if(!v)return"";const c=v==="Looks cheap"?"p-good":v==="Looks expensive"?"p-bad":v==="Around fair value"?"p-neutral":"p-warn";return`<span class="pill ${c}">${esc(v)}</span>`}
+function ccPill(s,n){const c=s==="Pass"?"p-good":s==="Pass so far"?"p-warn":s==="Fail"?"p-bad":"p-neutral";const t=s==="Pass so far"?`Coffee Can: passes ${n}y`:`Coffee Can: ${s}`;return`<span class="pill ${c}" title="Revenue growth >10% and ROCE >15% every year">${esc(t)}</span>`}
+
+/* ---------- data ---------- */
+async function getJSON(p){const r=await fetch(p);if(!r.ok)throw new Error(p+" "+r.status);return r.json()}
+async function company(sym){if(!S.cache[sym])S.cache[sym]=getJSON("data/company/"+sym.replace(/&/g,"_")+".json");return S.cache[sym]}
+const enc=s=>s.replace(/&/g,"-amp-");const dec=s=>s.replace(/-amp-/g,"&");
+
+/* ---------- charts ---------- */
+function clearCharts(){S.charts.forEach(c=>{try{c.remove()}catch(e){}});S.charts=[]}
+function mkChart(el,opts={}){
+  const c=LightweightCharts.createChart(el,{autoSize:true,
+    layout:{background:{type:"solid",color:"transparent"},textColor:css("--muted"),fontFamily:"IBM Plex Mono, monospace",fontSize:11},
+    grid:{vertLines:{color:css("--chart-grid")},horzLines:{color:css("--chart-grid")}},
+    rightPriceScale:{borderColor:css("--line")},timeScale:{borderColor:css("--line")},
+    crosshair:{mode:0},localization:{priceFormatter:opts.fmt||(p=>nf(p,p<100?2:0))},...opts.extra});
+  S.charts.push(c);return c}
+const ser=(t,v)=>{const o=[];for(let i=0;i<t.length;i++)if(v[i]!=null&&isFinite(v[i]))o.push({time:t[i],value:v[i]});return o};
+
+/* ---------- routing ---------- */
+let current="screen";
+function route(){
+  const h=decodeURIComponent(location.hash.slice(1))||"screen";
+  document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on",h===a.dataset.v||h.startsWith(a.dataset.v+"-")));
+  clearCharts();
+  if(h.startsWith("company-"))return viewCompany(dec(h.slice(8)));
+  if(h==="company")return viewCompany(S.lastCompany||(S.summary.slice().sort((a,b)=>(b.mcap||0)-(a.mcap||0))[0]||{}).symbol);
+  if(h.startsWith("sector-"))return viewSector(S.sectorKeys[+h.slice(7)]);
+  if(h==="sector")return viewSector(S.lastSector);
+  if(h==="factors")return viewFactors();
+  if(h==="news")return viewNews();
+  if(h==="method")return viewMethod();
+  return viewScreen();
+}
+window.addEventListener("hashchange",route);
+const go=h=>{if(location.hash==="#"+h)route();else location.hash=h};
+const goCompany=s=>go("company-"+enc(s));
+
+/* ---------- search ---------- */
+function setupSearch(){
+  const q=$("#q"),box=$("#sugg");let hits=[],hl=0;
+  const draw=()=>{box.innerHTML=hits.map((h,i)=>`<div class="${i===hl?"hl":""}" data-s="${esc(h.symbol)}">${esc(h.name)}<span>${esc(h.symbol)}</span></div>`).join("");box.hidden=!hits.length};
+  q.addEventListener("input",()=>{const t=q.value.trim().toLowerCase();hl=0;
+    hits=t?S.summary.filter(r=>r.symbol.toLowerCase().includes(t)||r.name.toLowerCase().includes(t)).sort((a,b)=>(a.symbol.toLowerCase().startsWith(t)?0:1)-(b.symbol.toLowerCase().startsWith(t)?0:1)||(b.mcap||0)-(a.mcap||0)).slice(0,10):[];draw()});
+  q.addEventListener("keydown",e=>{if(e.key==="ArrowDown"){hl=Math.min(hl+1,hits.length-1);draw();e.preventDefault()}else if(e.key==="ArrowUp"){hl=Math.max(hl-1,0);draw();e.preventDefault()}else if(e.key==="Enter"&&hits[hl]){goCompany(hits[hl].symbol);q.value="";hits=[];draw()}else if(e.key==="Escape"){hits=[];draw()}});
+  box.addEventListener("mousedown",e=>{const d=e.target.closest("[data-s]");if(d){goCompany(d.dataset.s);q.value="";hits=[];draw()}});
+  q.addEventListener("blur",()=>setTimeout(()=>{box.hidden=true},150));
+}
+
+/* ---------- sortable table helper ---------- */
+function table(el,cols,rows,{sort="mcap",dir=-1,onRow}={}){
+  let sk=sort,sd=dir;
+  const render=()=>{
+    const r=rows.slice().sort((a,b)=>{const x=a[sk],y=b[sk];if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return-1;return(typeof x==="string"?x.localeCompare(y):x-y)*sd});
+    el.innerHTML=`<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th class="${c.n?"n":""}" data-k="${c.k}">${esc(c.l)}${c.k===sk?(sd>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead><tbody>${
+      r.map(x=>`<tr class="${onRow?"click":""}" data-s="${esc(x.symbol)}">${cols.map(c=>`<td class="${c.n?"n":""}">${c.r?c.r(x):esc(x[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    el.querySelectorAll("th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd=-sd;else{sk=k;sd=-1}render()});
+    if(onRow)el.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=()=>onRow(tr.dataset.s));
+  };render();
+}
+const nameCell=x=>`<div class="nm">${esc(x.name)}</div><div class="sy">${esc(x.symbol)}</div>`;
+
+/* ================= SCREEN ================= */
+function viewScreen(){
+  const v=$("#view");
+  const inds=[...new Set(S.summary.map(r=>r.industry))].sort();
+  const counts={cc:S.summary.filter(r=>r.coffee_can==="Pass"||r.coffee_can==="Pass so far").length,
+    cheap:S.summary.filter(r=>r.verdict==="Looks cheap").length,exp:S.summary.filter(r=>r.verdict==="Looks expensive").length};
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s5)">
+   <div class="row between"><div><h1>Screen the Nifty 500</h1><p class="muted" style="margin:4px 0 0">Coffee Can filters first, then valuation. Click a row to open the company.</p></div>
+    <div class="kpis" style="flex:1;max-width:560px">
+     <div class="kpi"><b>${S.summary.length}</b><span>companies covered</span></div>
+     <div class="kpi"><b>${counts.cc}</b><span>pass Coffee Can on available years</span></div>
+     <div class="kpi"><b style="color:var(--good)">${counts.cheap}</b><span>look cheap</span></div>
+     <div class="kpi"><b style="color:var(--bad)">${counts.exp}</b><span>look expensive</span></div>
+    </div></div>
+   <div class="row">
+    <select id="f-ind" aria-label="Sector"><option value="">All sectors</option>${inds.map(i=>`<option>${esc(i)}</option>`).join("")}</select>
+    <select id="f-cc" aria-label="Coffee Can"><option value="">Any Coffee Can result</option><option value="pass">Passes (all years available)</option><option value="Pass">Passes full 10 years</option><option value="Fail">Fails</option></select>
+    <select id="f-v" aria-label="Verdict"><option value="">Any valuation</option><option>Looks cheap</option><option>Around fair value</option><option>Looks expensive</option></select>
+    <select id="f-b" aria-label="Buffett checks"><option value="0">Any Buffett score</option><option value="4">4+ quality checks</option><option value="5">5+ quality checks</option></select>
+    <span class="note" id="f-n"></span>
+   </div>
+   <div id="screen-t"></div>
+  </div>`;
+  const cols=[
+    {k:"name",l:"Company",r:nameCell},{k:"industry",l:"Sector",r:x=>`<span class="muted">${esc(x.industry)}</span>`},
+    {k:"mcap",l:"Mkt cap",n:1,r:x=>cr(x.mcap)},{k:"pe",l:"PE",n:1,r:x=>sx(x.pe)},
+    {k:"pe_pct",l:"PE pctile (own)",n:1,r:x=>x.pe_pct==null?"–":(x.pe_pct*100).toFixed(0)},
+    {k:"roce",l:"ROCE / ROE",n:1,r:x=>pct(x.financial?x.roe:x.roce)},
+    {k:"rev_cagr3",l:"Rev CAGR 3y",n:1,r:x=>pct(x.rev_cagr3)},
+    {k:"implied_growth",l:"Implied g",n:1,r:x=>pct(x.implied_growth,0)},
+    {k:"expected_growth",l:"Expected g",n:1,r:x=>pct(x.expected_growth,0)},
+    {k:"upside",l:"DCF upside",n:1,r:x=>x.upside==null?"–":`<span style="color:${x.upside>0?"var(--good)":"var(--bad)"}">${pct(x.upside,0)}</span>`},
+    {k:"cc_years",l:"Coffee Can",r:x=>ccPill(x.coffee_can,x.cc_years)},
+    {k:"buffett_score",l:"Buffett",n:1,r:x=>`${x.buffett_score}/${x.buffett_total}`},
+    {k:"score",l:"Valuation",r:x=>verdictPill(x.verdict)},
+  ];
+  const apply=()=>{
+    const i=$("#f-ind").value,c=$("#f-cc").value,vv=$("#f-v").value,b=+$("#f-b").value;
+    const rows=S.summary.filter(r=>(!i||r.industry===i)&&(!c||(c==="pass"?(r.coffee_can==="Pass"||r.coffee_can==="Pass so far"):r.coffee_can===c))&&(!vv||r.verdict===vv)&&r.buffett_score>=b);
+    $("#f-n").textContent=rows.length+" shown";
+    table($("#screen-t"),cols,rows,{onRow:goCompany});
+  };
+  ["f-ind","f-cc","f-v","f-b"].forEach(id=>$("#"+id).onchange=apply);apply();
+}
+
+/* ================= COMPANY ================= */
+async function viewCompany(sym){
+  const v=$("#view");if(!sym){v.innerHTML='<div class="empty">Search for a company above.</div>';return}
+  S.lastCompany=sym;v.innerHTML='<div class="empty">Loading '+esc(sym)+'…</div>';
+  let c;try{c=await company(sym)}catch(e){v.innerHTML='<div class="empty">No data for '+esc(sym)+' yet.</div>';return}
+  const m=c.metrics,sec=S.sectors[c.industry]||{},d=c.dcf||{},cc=c.coffee_can,vd=c.verdict||{};
+  const q=c.financial?"ROE":"ROCE";
+  const yrs=c.annual.length, src=Object.values(c.sources||{});
+  const scr=src.filter(s=>s==="screener").length;
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s4)">
+   <div class="row between" style="align-items:flex-end">
+    <div><div class="row" style="gap:10px"><h1>${esc(c.name)}</h1><span class="mono muted">${esc(c.symbol)}</span></div>
+     <div class="row" style="margin-top:6px"><a href="#sector-${S.sectorKeys.indexOf(c.industry)}" class="pill p-neutral" style="text-decoration:none">${esc(c.industry)}</a>${verdictPill(vd.label)}${ccPill(cc.status,cc.years_checked)}<span class="pill p-neutral">Buffett ${c.buffett.filter(b=>b.pass).length}/${c.buffett.length}</span></div></div>
+    <div class="kpis" style="flex:1;max-width:760px">
+     <div class="kpi"><b>${rs(m.price)}</b><span>close ${esc(m.price_date||"")}</span></div>
+     <div class="kpi"><b>${cr(m.mcap)}</b><span>market cap</span></div>
+     <div class="kpi"><b>${sx(m.pe)}</b><span>PE · sector ${sx(sec.median_pe)}</span></div>
+     <div class="kpi"><b>${pct(c.financial?m.roe:m.roce)}</b><span>${q} · sector ${pct(c.financial?sec.median_roe:sec.median_roce)}</span></div>
+     <div class="kpi"><b style="color:${(m.ret_1y||0)>=0?"var(--good)":"var(--bad)"}">${pct(m.ret_1y)}</b><span>1y return</span></div>
+    </div>
+   </div>
+   ${yrs<10?`<div class="banner">${yrs} years of fundamentals available${scr?` (${scr} from your Screener export)`:""}. The 10-year Coffee Can test and long valuation history need more years: export this company from Screener.in and drop the file in <span class="mono">data/screener_exports/</span>.</div>`:""}
+   <div class="grid g2">
+    <div class="card"><div class="row between"><h3>Price</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}</div></div><div class="chart" id="ch-price"></div></div>
+    <div class="card"><h3>Why it looks ${esc((vd.label||"").replace("Looks ","").toLowerCase()||"this way")}</h3>
+     ${vd.signals?`<p class="note" style="margin-top:0">Based on ${vd.signals} of 3 signals (reverse DCF, own history, peer-justified PE)${vd.signals<3?". Fewer signals means lower confidence":""}.</p>`:""}<ul class="reasons">${(vd.reasons||[]).map(r=>`<li>${esc(r)}</li>`).join("")||"<li class='muted'>No strong signal either way.</li>"}</ul>
+     ${d.fair_value?`<div style="margin-top:var(--s4)"><h3 style="margin-bottom:8px">DCF value per share (FCFE, Damodaran-style)</h3>
+      <div class="fv"><div><span class="note">Bear (g ${pct(d.expected_growth-0.04,0)})</span><b>${rs(d.fair_value.bear)}</b></div><div><span class="note">Base (g ${pct(d.expected_growth,0)})</span><b>${rs(d.fair_value.base)}</b></div><div><span class="note">Bull (g ${pct(d.expected_growth+0.04,0)})</span><b>${rs(d.fair_value.bull)}</b></div></div>
+      <p class="note" style="margin:8px 0 0">Price ${rs(m.price)} implies ${pct(d.implied_growth,1)} a year profit growth for ${d.years} years at ${pct(d.cost_of_equity,1)} cost of equity and ${pct(d.roe_used,0)} ROE. Expected growth is the median of: ${(d.growth_inputs||[]).map(g=>esc(g[0])+" "+pct(g[1],0)).join(", ")}.</p></div>`:""}
+     ${c.peer&&c.peer.justified_pe?`<p class="note" style="margin-top:8px">Peer-justified PE given its ${q} and growth: <b class="mono">${sx(c.peer.justified_pe)}</b> vs actual ${sx(m.pe)}.</p>`:""}
+    </div>
+   </div>
+   <div class="grid g2e">
+    <div class="card"><div class="row between"><h3>Valuation history</h3><div class="row" id="vm">${[["pe","PE"],["pb","P/B"],["ev_ebitda","EV/EBITDA"],["ps","P/S"]].map(([k,l],i)=>`<button data-k="${k}" class="${i===(c.financial?1:0)?"on":""}">${l}</button>`).join("")}</div></div>
+     <div class="chart sm" id="ch-val"></div><div class="legend" id="lg-val"></div></div>
+    <div class="card"><div class="row between"><h3>Fundamentals by year</h3><select id="fm" aria-label="Fundamental metric">${[["revenue","Revenue"],["net_income","Net profit"],["ebitda","EBITDA"],["fcf","Free cash flow"],["roce","ROCE"],["roe","ROE"],["opm","Operating margin"],["npm","Net margin"],["de","Debt / Equity"],["eps","EPS"]].filter(([k])=>c.annual.some(a=>a[k]!=null)).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></div>
+     <div class="chart sm" id="ch-fund"></div><div class="legend"><span><i style="background:${PAL[0]}"></i>${esc(c.symbol)}</span><span class="note">Bars are fiscal years. Dashed line is the sector median today.</span></div></div>
+   </div>
+   <div class="grid g3">
+    <div class="card"><h3>Coffee Can test</h3>${coffeeGrid(cc)}<p class="note">Saurabh Mukherjea's rule: revenue growth above 10% and ${cc.metric} above 15% in every one of the last 10 years. ${esc(cc.note||"")}</p></div>
+    <div class="card"><h3>Buffett-style quality</h3>${c.buffett.map(b=>`<div class="check"><span>${esc(b.name)}<br><span class="note">${esc(b.value)}</span></span><span class="pill ${b.pass?"p-good":"p-bad"}">${b.pass?"Yes":"No"}</span></div>`).join("")||"<p class='muted'>Not enough data.</p>"}</div>
+    <div class="card"><h3>Where the return came from</h3>${decomp(c.decomposition)}</div>
+   </div>
+   <div class="grid g2e">
+    <div class="card"><h3>What this company does differently from its sector</h3>${peerDiff(c)}</div>
+    <div class="card"><h3>Results expectations</h3>${estimates(c)}</div>
+   </div>
+   <div class="card"><h3>Annual figures (₹ crore)</h3><div id="annual-t"></div><p class="note">Source per year: ${Object.entries(c.sources||{}).map(([y,s])=>y+" "+s).join(" · ")}</p></div>
+   <div class="grid g2e">
+    <div class="card"><h3>Announcements</h3>${feedHtml(c.events.slice(0,15),false)||"<p class='muted'>No announcements collected yet. The daily run keeps adding them.</p>"}</div>
+    <div class="card"><h3>About</h3><p class="prose" style="margin:0">${esc(c.about||"")}</p>${c.website?`<p><a href="${esc(c.website)}" target="_blank" rel="noopener">${esc(c.website)}</a></p>`:""}</div>
+   </div>
+  </div>`;
+
+  // price chart
+  const pc=mkChart($("#ch-price"));
+  const pl=pc.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2});
+  pl.setData(ser(c.price.t,c.price.c));
+  const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];if(r==="Max"){pc.timeScale().fitContent();return}
+    const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];const d0=new Date(end);d0.setFullYear(d0.getFullYear()-y);pc.timeScale().setVisibleRange({from:d0.toISOString().slice(0,10),to:end})};
+  setR("5Y");
+  $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
+
+  // valuation chart
+  const vc=mkChart($("#ch-val"),{fmt:p=>p.toFixed(1)});
+  let vs=[];
+  const drawVal=k=>{vs.forEach(s=>vc.removeSeries(s));vs=[];if(!c.val){$("#lg-val").textContent="No valuation history yet.";return}
+    const main=vc.addLineSeries({color:PAL[0],lineWidth:2});main.setData(ser(c.val.t,c.val[k]));vs.push(main);
+    const st=c.history_stats[k];
+    if(st){main.createPriceLine({price:st.median,color:css("--muted"),lineStyle:2,lineWidth:1,axisLabelVisible:true,title:"own median"})}
+    const ss=sec.series&&sec.series[k];
+    if(ss&&ss.t.length){const s2=vc.addLineSeries({color:PAL[1],lineWidth:1,lineStyle:0});s2.setData(ser(ss.t,ss.v));vs.push(s2)}
+    vc.timeScale().fitContent();
+    $("#lg-val").innerHTML=`<span><i style="background:${PAL[0]}"></i>${esc(c.symbol)}</span>${ss?`<span><i style="background:${PAL[1]}"></i>Sector median</span>`:""}<span>Dashed: own median ${st?st.median.toFixed(1):"–"} · now at ${st&&st.pct!=null?(st.pct*100).toFixed(0)+"th":"–"} percentile</span>`};
+  drawVal(c.financial?"pb":"pe");
+  $("#vm").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#vm").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));drawVal(b.dataset.k)};
+
+  // fundamentals chart
+  const pcts=new Set(["roce","roe","opm","npm"]);
+  const fc=mkChart($("#ch-fund"),{fmt:p=>p.toFixed(1)});let fs=null;
+  const drawF=k=>{if(fs)fc.removeSeries(fs);const mul=pcts.has(k)?100:1;
+    fs=fc.addHistogramSeries({color:PAL[0]});
+    fs.setData(c.annual.filter(a=>a[k]!=null&&a.period_end).map(a=>({time:a.period_end,value:a[k]*mul,color:a[k]<0?css("--bad"):PAL[0]})));
+    const sm=sec["median_"+k];if(sm!=null)fs.createPriceLine({price:sm*mul,color:PAL[1],lineStyle:2,lineWidth:1,axisLabelVisible:true,title:"sector"});
+    fc.timeScale().fitContent()};
+  const fsel=$("#fm");if(fsel.value)drawF(fsel.value);fsel.onchange=()=>drawF(fsel.value);
+
+  // annual table
+  const rows=c.annual.slice().reverse().map(a=>({...a,symbol:String(a.fy)}));
+  table($("#annual-t"),[{k:"fy",l:"FY"},{k:"revenue",l:"Revenue",n:1,r:x=>nf(x.revenue,0)},{k:"ebitda",l:"EBITDA",n:1,r:x=>nf(x.ebitda,0)},
+    {k:"net_income",l:"Net profit",n:1,r:x=>nf(x.net_income,0)},{k:"eps",l:"EPS",n:1,r:x=>nf(x.eps,2)},{k:"rev_growth",l:"Rev growth",n:1,r:x=>pct(x.rev_growth)},
+    {k:"roce",l:"ROCE",n:1,r:x=>pct(x.roce)},{k:"roe",l:"ROE",n:1,r:x=>pct(x.roe)},{k:"opm",l:"OPM",n:1,r:x=>pct(x.opm)},
+    {k:"debt",l:"Debt",n:1,r:x=>nf(x.debt,0)},{k:"de",l:"D/E",n:1,r:x=>nf(x.de,2)},{k:"fcf",l:"FCF",n:1,r:x=>nf(x.fcf,0)},{k:"cash_conversion",l:"CFO/PAT",n:1,r:x=>nf(x.cash_conversion,2)}],
+    rows,{sort:"fy",dir:-1});
+}
+function coffeeGrid(cc){
+  const d=cc.detail||[];if(!d.length)return"<p class='muted'>No data.</p>";
+  const cell=ok=>`<div class="${ok==null?"na":ok?"ok":"no"}">${ok==null?"·":ok?"✓":"✗"}</div>`;
+  return`<div class="ccgrid" style="--n:${d.length}"><div class="lab"></div>${d.map(x=>`<div class="lab" style="text-align:center">${String(x.fy).slice(2)}</div>`).join("")}
+   <div class="lab">Growth &gt;10%</div>${d.map(x=>cell(x.growth_ok)).join("")}
+   <div class="lab">${cc.metric} &gt;15%</div>${d.map(x=>cell(x.quality_ok)).join("")}</div>
+   <p style="margin:8px 0 4px">${ccPill(cc.status,cc.years_checked)} <span class="note">${cc.years_checked} of ${cc.years_needed} years checked${cc.failed_years.length?" · failed in "+cc.failed_years.join(", "):""}</span></p>`}
+function decomp(d){
+  if(!d)return"<p class='muted'>Needs at least a year of profitable history.</p>";
+  const tot=Math.abs(d.earnings_cagr)+Math.abs(d.rerating_cagr)||1;
+  const bar=(lab,x)=>`<div style="margin:8px 0"><div class="row between"><span>${lab}</span><b class="mono">${pct(x)}/yr</b></div><div class="bar"><i class="${x<0?"neg":""}" style="left:0;width:${Math.min(100,Math.abs(x)/tot*100)}%"></i></div></div>`;
+  return`<p class="note" style="margin-top:0">${d.from} to ${d.to} (${d.years} years). Price return ≈ earnings growth + change in PE.</p>
+   ${bar("Price",d.price_cagr)}${bar("Earnings growth",d.earnings_cagr)}${bar("Re-rating (PE "+d.pe_from.toFixed(0)+" → "+d.pe_to.toFixed(0)+")",d.rerating_cagr)}
+   <p class="note">${d.share_from_earnings==null?"":d.share_from_earnings>0.7?"Mostly earned through profit growth.":d.share_from_earnings<0.3?"Mostly driven by the market paying a higher multiple.":"A mix of profit growth and re-rating."}</p>`}
+function peerDiff(c){
+  const d=(c.peer&&c.peer.vs_sector)||[];if(!d.length)return"<p class='muted'>Not enough peer data.</p>";
+  const f=k=>["npm","opm","roce","roe","rev_cagr3"].includes(k)?pct:x=>sx(x,2);
+  return`<div style="overflow-x:auto"><table><thead><tr><th>Metric</th><th class="n">${esc(c.symbol)}</th><th class="n">Sector median</th><th>Difference</th></tr></thead><tbody>${d.map(x=>{
+    const r=x.rel;const w=r==null?0:Math.min(50,Math.abs(r)*50);const good=x.metric==="leverage"?r<0:r>0;
+    return`<tr><td>${esc(x.label)}</td><td class="n">${f(x.metric)(x.value)}</td><td class="n">${f(x.metric)(x.sector)}</td><td style="min-width:120px"><div class="bar"><i class="${good?"":"neg"}" style="left:${r<0?50-w:50}%;width:${w}%"></i></div></td></tr>`}).join("")}</tbody></table></div>
+   <p class="note">ROE splits into net margin × asset turnover × leverage (DuPont), which shows whether the company earns more through pricing power, efficiency or borrowing.</p>`}
+function estimates(c){
+  const e=c.estimates||{},a=c.analyst||{};let h="";
+  const ne=Array.isArray(e.next_earnings)?e.next_earnings[0]:e.next_earnings;
+  if(ne)h+=`<p style="margin-top:0">Next results expected around <b>${esc(ne)}</b>.</p>`;
+  const rowE=(lab,o,fmt)=>o?`<tr><td>${lab}</td><td class="n">${fmt(o.avg)}</td><td class="n">${fmt(o.low)} – ${fmt(o.high)}</td><td class="n">${o.growth==null?"–":pct(o.growth)}</td><td class="n">${o.numberOfAnalysts??"–"}</td></tr>`:"";
+  const eps=e.eps||{},rev=e.revenue||{};
+  const rcr=x=>x==null?"–":cr(x/1e7);
+  const body=rowE("EPS this quarter",eps["0q"],x=>nf(x,2))+rowE("EPS this FY",eps["0y"],x=>nf(x,2))+rowE("EPS next FY",eps["+1y"],x=>nf(x,2))+rowE("Revenue this quarter",rev["0q"],rcr)+rowE("Revenue this FY",rev["0y"],rcr);
+  if(body)h+=`<div style="overflow-x:auto"><table><thead><tr><th>Consensus</th><th class="n">Avg</th><th class="n">Range</th><th class="n">Growth</th><th class="n">Analysts</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  const su=(e.surprises||[]).filter(x=>x.reported!=null).slice(0,6);
+  if(su.length)h+=`<h3 style="margin:14px 0 6px">Recent results vs estimate</h3><div class="row">${su.map(x=>`<span class="pill ${x.surprise_pct>=0?"p-good":"p-bad"}" title="EPS ${x.reported} vs ${x.estimate}">${x.date.slice(0,7)} ${x.surprise_pct>=0?"+":""}${nf(x.surprise_pct,1)}%</span>`).join("")}</div>`;
+  if(a.targetMeanPrice)h+=`<p class="note">Analyst mean target ${rs(a.targetMeanPrice)} (${a.numberOfAnalystOpinions||"?"} analysts, "${esc(a.recommendationKey||"")}"). Treat as sentiment, not value.</p>`;
+  return h||"<p class='muted'>No consensus estimates available for this company.</p>"}
+function feedHtml(items,showCo=true){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="mono note">${esc((e.date||"").replace("T"," "))}</span><div>${showCo?`<a href="#company-${enc(e.symbol)}"><b>${esc(e.symbol)}</b></a> · `:""}<b>${esc(e.subject||e.kind)}</b><div class="note">${esc(e.text)}</div>${e.link&&/^https:\/\//.test(e.link)?`<a href="${esc(e.link)}" target="_blank" rel="noopener">Filing</a>`:""}</div></div>`).join("")}</div>`:""}
+
+/* ================= SECTOR ================= */
+async function viewSector(ind){
+  const v=$("#view");ind=ind||S.sectorKeys[0];S.lastSector=ind;const sec=S.sectors[ind];
+  if(!sec){v.innerHTML='<div class="empty">No sector data.</div>';return}
+  const rows=S.summary.filter(r=>r.industry===ind);const fin=sec.financial,q=fin?"roe":"roce";
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s4)">
+   <div class="row between"><div><h1>${esc(ind)}</h1><p class="muted" style="margin:4px 0 0">${sec.count} Nifty 500 companies · ${cr(sec.total_mcap)} combined market cap</p></div>
+    <select id="sec-sel" aria-label="Choose sector">${S.sectorKeys.map((k,i)=>`<option value="${i}" ${k===ind?"selected":""}>${esc(k)} (${S.sectors[k].count})</option>`).join("")}</select></div>
+   <div class="kpis">
+    <div class="kpi"><b>${sx(sec.median_pe)}</b><span>median PE</span></div><div class="kpi"><b>${sx(sec.median_pb)}</b><span>median P/B</span></div>
+    <div class="kpi"><b>${pct(fin?sec.median_roe:sec.median_roce)}</b><span>median ${fin?"ROE":"ROCE"}</span></div>
+    <div class="kpi"><b>${pct(sec.median_rev_cagr3)}</b><span>median revenue CAGR 3y</span></div>
+    <div class="kpi"><b>${fin?pct(sec.median_npm):pct(sec.median_opm)}</b><span>median ${fin?"net":"operating"} margin</span></div>
+    <div class="kpi"><b>${rows.filter(r=>r.coffee_can==="Pass"||r.coffee_can==="Pass so far").length}</b><span>pass Coffee Can</span></div>
+   </div>
+   <div class="grid g2">
+    <div class="card"><div class="row between"><h3>Valuation through time, top peers vs sector median</h3><div class="row" id="sv">${[["pe","PE"],["pb","P/B"],["ev_ebitda","EV/EBITDA"]].map(([k,l])=>`<button data-k="${k}" class="${k===(fin?"pb":"pe")?"on":""}">${l}</button>`).join("")}</div></div>
+     <div class="chart" id="ch-sec"></div><div class="legend" id="lg-sec"></div></div>
+    <div class="card"><h3>What the market rewards here</h3><p class="note" style="margin-top:0">Rank correlation between each factor and ${fin?"P/B":"PE"} across peers today. A strong positive bar means investors pay more for companies that score higher on it.</p>
+     ${(sec.rewards||[]).map(r=>`<div style="margin:8px 0"><div class="row between"><span>${esc((FACT[r.factor]||{l:r.factor}).l)}</span><b class="mono">${r.rho.toFixed(2)}</b></div><div class="bar"><i class="${r.rho<0?"neg":""}" style="left:${r.rho<0?50+r.rho*50:50}%;width:${Math.abs(r.rho)*50}%"></i></div></div>`).join("")||"<p class='muted'>Too few peers.</p>"}
+    </div>
+   </div>
+   <div class="card"><div class="row between"><h3>Peer fundamentals by year</h3><select id="sf" aria-label="Peer metric">${[[q,fin?"ROE":"ROCE"],["rev_growth","Revenue growth"],["opm","Operating margin"],["npm","Net margin"],["de","Debt / Equity"],["revenue","Revenue"]].filter(([k])=>!(fin&&(k==="opm"||k==="de"))).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></div><div class="chart sm" id="ch-secf"></div><div class="legend" id="lg-secf"></div></div>
+   <div><h2 style="margin-bottom:8px">Peer-to-peer table</h2><div id="peer-t"></div>
+   <p class="note">Justified PE comes from a regression of PE on ${fin?"ROE":"ROCE"} and 3-year revenue growth across this sector. A PE well above it means the premium is not explained by quality or growth.</p></div>
+  </div>`;
+  $("#sec-sel").onchange=e=>go("sector-"+e.target.value);
+  table($("#peer-t"),[{k:"name",l:"Company",r:nameCell},{k:"mcap",l:"Mkt cap",n:1,r:x=>cr(x.mcap)},{k:"pe",l:"PE",n:1,r:x=>sx(x.pe)},{k:"justified_pe",l:"Justified PE",n:1,r:x=>sx(x.justified_pe)},
+    {k:"pb",l:"P/B",n:1,r:x=>sx(x.pb)},{k:q,l:fin?"ROE":"ROCE",n:1,r:x=>pct(x[q])},{k:"rev_cagr3",l:"Rev CAGR 3y",n:1,r:x=>pct(x.rev_cagr3)},{k:"ni_cagr3",l:"Profit CAGR 3y",n:1,r:x=>pct(x.ni_cagr3)},
+    {k:fin?"npm":"opm",l:fin?"Net margin":"OPM",n:1,r:x=>pct(fin?x.npm:x.opm)},...(fin?[]:[{k:"de",l:"D/E",n:1,r:x=>sx(x.de,2)}]),{k:"ret_1y",l:"1y",n:1,r:x=>pct(x.ret_1y,0)},
+    {k:"cc_years",l:"Coffee Can",r:x=>ccPill(x.coffee_can,x.cc_years)},{k:"score",l:"Valuation",r:x=>verdictPill(x.verdict)}],rows,{onRow:goCompany});
+
+  const top=sec.members.slice(0,7);
+  const peers=(await Promise.all(top.map(s=>company(s).catch(()=>null)))).filter(Boolean);
+  if(S.lastSector!==ind)return;
+  const ch=mkChart($("#ch-sec"),{fmt:p=>p.toFixed(1)});let ss=[];
+  const draw=k=>{ss.forEach(s=>ch.removeSeries(s));ss=[];
+    peers.forEach((p,i)=>{if(!p.val)return;const s=ch.addLineSeries({color:PAL[(i+2)%PAL.length],lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});s.setData(ser(p.val.t,p.val[k].map(x=>x!=null&&x<500?x:null)));ss.push(s)});
+    const sm=sec.series&&sec.series[k];if(sm){const s=ch.addLineSeries({color:css("--ink"),lineWidth:3});s.setData(ser(sm.t,sm.v));ss.push(s)}
+    ch.timeScale().fitContent();
+    $("#lg-sec").innerHTML=`<span><i style="background:${css("--ink")}"></i>Sector median</span>`+peers.map((p,i)=>`<span><i style="background:${PAL[(i+2)%PAL.length]}"></i>${esc(p.symbol)}</span>`).join("")};
+  draw(fin?"pb":"pe");
+  $("#sv").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#sv").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));draw(b.dataset.k)};
+  const cf=mkChart($("#ch-secf"),{fmt:p=>p.toFixed(1)});let fs=[];
+  const drawF=k=>{fs.forEach(s=>cf.removeSeries(s));fs=[];const mul=["roce","roe","opm","npm","rev_growth"].includes(k)?100:1;
+    peers.forEach((p,i)=>{const d=p.annual.filter(a=>a[k]!=null&&a.period_end).map(a=>({time:a.period_end,value:a[k]*mul}));if(!d.length)return;
+      const s=cf.addLineSeries({color:PAL[(i+2)%PAL.length],lineWidth:2,pointMarkersVisible:true,priceLineVisible:false,lastValueVisible:false});s.setData(d);fs.push(s)});
+    cf.timeScale().fitContent();
+    $("#lg-secf").innerHTML=peers.map((p,i)=>`<span><i style="background:${PAL[(i+2)%PAL.length]}"></i>${esc(p.symbol)}</span>`).join("")+`<span class="note">Largest ${peers.length} by market cap</span>`};
+  drawF($("#sf").value);$("#sf").onchange=e=>drawF(e.target.value);
+}
+
+/* ================= FACTORS ================= */
+function viewFactors(){
+  const v=$("#view");const keys=Object.keys(FACT);const inds=[...new Set(S.summary.map(r=>r.industry))].sort();
+  const opt=(sel)=>keys.map(k=>`<option value="${k}" ${k===sel?"selected":""}>${esc(FACT[k].l)}</option>`).join("");
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s4)">
+   <div><h1>Factor vs factor</h1><p class="muted" style="margin:4px 0 0">Plot any two measures across companies. The classic check: are you paying more for genuinely better businesses?</p></div>
+   <div class="row">
+    <label>Y <select id="fy">${opt("pe")}</select></label><label>X <select id="fx">${opt("roce")}</select></label>
+    <select id="fi" aria-label="Sector filter"><option value="">All sectors</option>${inds.map(i=>`<option ${i===S.factorInd?"selected":""}>${esc(i)}</option>`).join("")}</select>
+    <label class="row" style="gap:4px"><input type="checkbox" id="flog"> log Y</label>
+    <span class="note" id="fstat"></span>
+   </div>
+   <div class="card"><div class="scatter" id="sc"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Looks cheap</span><span><i style="background:var(--muted)"></i>Around fair</span><span><i style="background:var(--bad)"></i>Looks expensive</span><span>Ring = passes Coffee Can on available years. Dot size = market cap. Click a dot to open the company.</span></div></div>
+  </div>`;
+  const draw=()=>{S.factorInd=$("#fi").value;scatter($("#fx").value,$("#fy").value,$("#fi").value,$("#flog").checked)};
+  ["fx","fy","fi","flog"].forEach(id=>$("#"+id).onchange=draw);draw();
+}
+function scatter(xk,yk,ind,logY){
+  const cv=$("#cv"),box=$("#sc"),tip=$("#tip");const dpr=window.devicePixelRatio||1;
+  const W=box.clientWidth,H=box.clientHeight;cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);
+  let pts=S.summary.filter(r=>(!ind||r.industry===ind)&&r[xk]!=null&&r[yk]!=null&&(!logY||r[yk]>0)).map(r=>({r,x:r[xk],y:r[yk]}));
+  const q=(arr,p)=>{const s=arr.slice().sort((a,b)=>a-b);return s[Math.floor((s.length-1)*p)]};
+  if(pts.length<3){g.fillStyle=css("--muted");g.fillText("Not enough data for these two factors.",20,30);$("#fstat").textContent="";return}
+  // trim extreme outliers (1st/99th pct) so the cloud is readable
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);const x0=q(xs,.01),x1=q(xs,.99),y0=q(ys,.01),y1=q(ys,.99);
+  pts=pts.filter(p=>p.x>=x0&&p.x<=x1&&p.y>=y0&&p.y<=y1);
+  const fy=logY?Math.log10:(v=>v);const L=64,R=16,T=16,B=40;
+  const mnx=Math.min(...pts.map(p=>p.x)),mxx=Math.max(...pts.map(p=>p.x)),mny=Math.min(...pts.map(p=>fy(p.y))),mxy=Math.max(...pts.map(p=>fy(p.y)));
+  const px=x=>L+(x-mnx)/((mxx-mnx)||1)*(W-L-R),py=y=>H-B-(fy(y)-mny)/((mxy-mny)||1)*(H-T-B);
+  g.strokeStyle=css("--chart-grid");g.fillStyle=css("--muted");g.font="11px IBM Plex Mono, monospace";g.lineWidth=1;
+  for(let i=0;i<=5;i++){const xv=mnx+(mxx-mnx)*i/5,X=px(xv);g.beginPath();g.moveTo(X,T);g.lineTo(X,H-B);g.stroke();g.textAlign="center";g.fillText(FACT[xk].f(xv),X,H-B+16)}
+  for(let i=0;i<=5;i++){const yl=mny+(mxy-mny)*i/5,yv=logY?10**yl:yl,Y=H-B-(yl-mny)/((mxy-mny)||1)*(H-T-B);g.beginPath();g.moveTo(L,Y);g.lineTo(W-R,Y);g.stroke();g.textAlign="right";g.fillText(FACT[yk].f(yv),L-6,Y+4)}
+  g.textAlign="center";g.fillStyle=css("--ink");g.fillText(FACT[xk].l+" →",(L+W-R)/2,H-6);
+  g.save();g.translate(14,(T+H-B)/2);g.rotate(-Math.PI/2);g.fillText(FACT[yk].l+" →",0,0);g.restore();
+  const col=v=>v==="Looks cheap"?css("--good"):v==="Looks expensive"?css("--bad"):css("--muted");
+  const mc=pts.map(p=>p.r.mcap||1),mmax=Math.max(...mc);
+  pts.forEach(p=>{p.X=px(p.x);p.Y=py(p.y);p.rad=3+Math.sqrt((p.r.mcap||0)/mmax)*14});
+  pts.sort((a,b)=>b.rad-a.rad).forEach(p=>{g.beginPath();g.arc(p.X,p.Y,p.rad,0,7);g.globalAlpha=.55;g.fillStyle=col(p.r.verdict);g.fill();g.globalAlpha=1;
+    if(p.r.coffee_can==="Pass"||p.r.coffee_can==="Pass so far"){g.lineWidth=2;g.strokeStyle=css("--accent");g.stroke()}});
+  if(ind||pts.length<60){g.fillStyle=css("--ink");g.textAlign="left";g.font="10px IBM Plex Mono, monospace";pts.forEach(p=>g.fillText(p.r.symbol,p.X+p.rad+2,p.Y+3))}
+  // rank correlation
+  const rk=a=>{const s=a.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]);const r=Array(a.length);s.forEach((v,i)=>r[v[1]]=i);return r};
+  const rx=rk(pts.map(p=>p.x)),ry=rk(pts.map(p=>p.y));const n=pts.length,mx=(n-1)/2;let a=0,b=0,c=0;for(let i=0;i<n;i++){a+=(rx[i]-mx)*(ry[i]-mx);b+=(rx[i]-mx)**2;c+=(ry[i]-mx)**2}
+  $("#fstat").textContent=`${n} companies · rank correlation ${(a/Math.sqrt(b*c)).toFixed(2)}`;
+  const hit=e=>{const rc=cv.getBoundingClientRect(),X=e.clientX-rc.left,Y=e.clientY-rc.top;let best=null,bd=1e9;pts.forEach(p=>{const d=(p.X-X)**2+(p.Y-Y)**2;if(d<bd&&d<(p.rad+4)**2){bd=d;best=p}});return[best,X,Y]};
+  cv.onmousemove=e=>{const[p,X,Y]=hit(e);if(!p){tip.style.display="none";cv.style.cursor="default";return}cv.style.cursor="pointer";
+    tip.innerHTML=`<b>${esc(p.r.name)}</b> <span class="mono muted">${esc(p.r.symbol)}</span><br>${esc(FACT[xk].l)}: ${FACT[xk].f(p.x)}<br>${esc(FACT[yk].l)}: ${FACT[yk].f(p.y)}<br>${verdictPill(p.r.verdict)}`;
+    tip.style.display="block";tip.style.left=Math.min(X+12,W-220)+"px";tip.style.top=Math.max(Y-10,0)+"px"};
+  cv.onmouseleave=()=>tip.style.display="none";
+  cv.onclick=e=>{const[p]=hit(e);if(p)goCompany(p.r.symbol)};
+}
+
+/* ================= NEWS ================= */
+async function viewNews(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
+  let ev=[];try{ev=await getJSON("data/events.json")}catch(e){}
+  const subj=[...new Set(ev.map(e=>e.subject).filter(Boolean))].sort();
+  v.innerHTML=`<div class="grid" style="gap:var(--s4)"><div><h1>Announcements</h1><p class="muted" style="margin:4px 0 0">Nifty 500 filings from NSE's public feeds, collected every evening. History grows from the day the app started.</p></div>
+   <div class="row"><select id="ns" aria-label="Type"><option value="">All types</option>${subj.map(s=>`<option>${esc(s)}</option>`).join("")}</select><input id="nq" placeholder="Filter by symbol" aria-label="Filter by symbol"></div>
+   <div class="card" id="nf"></div></div>`;
+  const draw=()=>{const s=$("#ns").value,q=$("#nq").value.trim().toUpperCase();const it=ev.filter(e=>(!s||e.subject===s)&&(!q||e.symbol.includes(q))).slice(0,200);$("#nf").innerHTML=feedHtml(it)||"<p class='muted'>Nothing yet.</p>"};
+  $("#ns").onchange=draw;$("#nq").oninput=draw;draw();
+}
+
+/* ================= METHOD ================= */
+function viewMethod(){
+  const c=S.meta.config||{};
+  $("#view").innerHTML=`<div class="prose">
+  <h1>How the valuation works</h1>
+  <p>Every evening after NSE closes, the pipeline pulls official closing prices, new filings and refreshed fundamentals, then recomputes everything below. It is a research aid. It is not investment advice.</p>
+  <h2>1. Coffee Can filter (primary)</h2>
+  <p>From Saurabh Mukherjea's <i>Coffee Can Investing</i>: a company qualifies only if revenue grew more than ${pct(c.cc_rev_growth,0)} and ROCE was above ${pct(c.cc_roce,0)} in <b>every</b> one of the last ${c.cc_years} years. Missing one year fails it. That is the point: consistency signals a durable moat. For lenders, ROE stands in for ROCE until the book's exact banking criteria are added. With fewer than 10 years of data the result reads "passes N years", and adding a Screener export completes the test.</p>
+  <h2>2. Buffett-style quality</h2>
+  <p>Durable ROE above 15%, debt-to-equity below 0.5, stable operating margins, positive free cash flow, operating cash flow that tracks reported profit, and the retained-earnings test (each rupee kept in the business should create at least a rupee of market value).</p>
+  <h2>3. Damodaran-style valuation</h2>
+  <p><b>Reverse DCF.</b> A two-stage FCFE model, where growth must be paid for by reinvestment (reinvestment rate = growth ÷ ROE). The price is solved backwards for the profit growth it implies over ${c.high_growth_years} years, then a terminal growth of ${pct(c.terminal_growth,1)}. Cost of equity = India risk-free ${pct(c.risk_free,1)} + beta × equity risk premium ${pct(c.equity_risk_premium,1)}, with beta clamped between 0.6 and 1.6.</p>
+  <p><b>Expected growth</b> is the median of analyst next-year EPS growth, 3-year revenue CAGR and 3-year profit CAGR, capped between −5% and 25%. The bear and bull values use 4 points less and 4 points more growth.</p>
+  <p><b>Relative value.</b> Current PE against the company's own history, and against a sector regression of PE on ROCE (ROE for lenders) and growth, which gives a quality-adjusted "justified PE".</p>
+  <h2>Verdict</h2>
+  <p>Three signals are blended: implied growth minus expected growth (40%), the PE percentile in its own history (25%), and the premium over the peer-justified PE (35%). "Looks expensive" and "Looks cheap" mark scores beyond ±0.35. Each verdict lists the reasons that drove it, plus context such as an earnings drop that inflates PE, high leverage, or a price rise that came from re-rating rather than earnings.</p>
+  <h2>Data and its limits</h2>
+  <ul><li>Prices: NSE bhavcopy (official daily file), backfilled from Yahoo Finance with split-adjusted history.</li>
+  <li>Fundamentals: Yahoo Finance gives about 4 annual years and recent quarters, plus analyst estimates. For 10 to 12 years, export the company from Screener.in yourself and drop the file in <span class="mono">data/screener_exports/</span>. The app never scrapes Screener, because its terms don't allow it.</li>
+  <li>Announcements: NSE's public RSS feeds, accumulated daily.</li>
+  <li>Historical market cap uses today's share count on split-adjusted prices, so large buybacks or equity raises distort old multiples a little.</li></ul>
+  <p class="note">Last updated ${esc(S.meta.updated||"")} · prices to ${esc(S.meta.price_date||"")}</p></div>`;
+}
+
+/* ---------- boot ---------- */
+(async function(){
+  try{
+    [S.summary,S.sectors,S.meta]=await Promise.all([getJSON("data/summary.json"),getJSON("data/sectors.json"),getJSON("data/meta.json")]);
+    S.sectorKeys=Object.keys(S.sectors).sort();
+    $("#asof").textContent="prices to "+(S.meta.price_date||"?");
+    setupSearch();route();
+  }catch(e){$("#view").innerHTML='<div class="empty">Could not load data: '+esc(e.message)+'</div>'}
+})();
+</script>

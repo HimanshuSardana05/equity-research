@@ -1,0 +1,59 @@
+name: Update data and publish
+
+on:
+  schedule:
+    - cron: "30 12 * * 1-5"   # 18:00 IST, Mon-Fri, after NSE bhavcopy is published
+    - cron: "0 3 * * 6"       # Saturday 08:30 IST: full price re-sync + bigger fundamentals refresh
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "daily | weekly | full | analyze"
+        default: daily
+  push:
+    branches: [main]
+    paths: ["data/screener_exports/**", "app/page.html", "pipeline/**"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Pick mode
+        id: mode
+        run: |
+          if [ -n "${{ github.event.inputs.mode }}" ]; then m="${{ github.event.inputs.mode }}";
+          elif [ "${{ github.event_name }}" = "push" ]; then m=analyze;
+          elif [ "${{ github.event.schedule }}" = "0 3 * * 6" ]; then m=weekly;
+          else m=daily; fi
+          echo "mode=$m" >> "$GITHUB_OUTPUT"
+      - name: Run pipeline
+        run: python pipeline/run.py ${{ steps.mode.outputs.mode }}
+      - name: Commit raw data history
+        run: |
+          git config user.name "data-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/raw
+          git diff --cached --quiet || git commit -m "data: ${{ steps.mode.outputs.mode }} update $(date -u +%F)"
+          git push || (git pull --rebase && git push)
+      - run: python pipeline/build_site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,4 @@
+app/data/
+dist/
+__pycache__/
+*.tmp
