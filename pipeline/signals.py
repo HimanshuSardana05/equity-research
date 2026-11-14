@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 STRATS_PATH = ROOT / "config" / "strategies.json"
 
 COLS = ["s", "date", "p", "kind", "lt", "zs", "strength", "vol", "trend", "tol", "atr", "phi", "plo", "zlo", "zhi",
-        "tgt", "brk", "a50", "s50", "a200", "ref", "path"]
+        "tgt", "brk", "a50", "s50", "a200", "liq", "ref", "path"]
 
 
 def _bp(x, ref):
@@ -49,10 +49,14 @@ def candidates(prices: pd.DataFrame, hist: dict, setups: list[dict], sidx: int =
     d = _frame(prices)
     d["sma50"] = d["close"].rolling(50).mean()
     d["sma200"] = d["close"].rolling(200).mean()
+    tv = (d["close"] * d["volume"]).rolling(20).mean().shift()  # average daily traded value, rupees
+    liq = np.log10((tv / 1e7).clip(lower=1e-3)).to_numpy()  # log10 of rupees crore
     dates = d.index.strftime("%Y-%m-%d").tolist()
     pos = {t: i for i, t in enumerate(dates)}
     lv_by_date = dict(zip(hist["t"], hist["lv"]))
     o, h, l, c = (d[k].to_numpy() for k in ("open", "high", "low", "close"))
+    # dividend factor: future candles are scaled by f[k]/f[i] so a dividend going ex is not mistaken for a fall
+    f = d["adj"].fillna(1.0).to_numpy() if "adj" in d else np.ones(len(d))
     s50, s200, atr = d["sma50"].to_numpy(), d["sma200"].to_numpy(), d["atr"].to_numpy()
     pkeys = list(PATTERNS)
     out = []
@@ -74,13 +78,15 @@ def candidates(prices: pd.DataFrame, hist: dict, setups: list[dict], sidx: int =
         for k in range(1, PATH_BARS + 1):
             if i + k >= len(c):
                 break
-            path += [_bp(o[i + k], ref), _bp(h[i + k], ref), _bp(l[i + k], ref), _bp(c[i + k], ref)]
+            m = f[i + k] / f[i] if f[i] > 0 else 1.0
+            path += [_bp(o[i + k] * m, ref), _bp(h[i + k] * m, ref), _bp(l[i + k] * m, ref), _bp(c[i + k] * m, ref)]
         out.append([sidx, st["date"], pkeys.index(st["pattern"]), 1 if st["kind"] == "break" else 0,
                     1 if st.get("lt") == "swing" else 0, st.get("zs"), st["strength"], st.get("vol"), 1 if st["trend"] else 0, st.get("tol", 0),
                     _bp(ref + a, ref), _bp(phi, ref), _bp(plo, ref), _bp(st["lo"], ref), _bp(st["hi"], ref),
                     _bp(_target(st["dir"], ref, lv_by_date.get(st["date"])), ref), round(brk, 2),
                     _bp(s50[i], ref) if np.isfinite(s50[i]) else None, slope,
-                    _bp(s200[i], ref) if np.isfinite(s200[i]) else None, round(ref, 2), path])
+                    _bp(s200[i], ref) if np.isfinite(s200[i]) else None,
+                    round(float(liq[i]), 2) if np.isfinite(liq[i]) else None, round(ref, 2), path])
     return out
 
 

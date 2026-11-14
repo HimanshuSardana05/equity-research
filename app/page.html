@@ -189,6 +189,7 @@ footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px 
   <nav class="tabs" id="tabs">
     <a href="#setups" data-v="setups">Setups</a>
     <a href="#backtest" data-v="backtest">Backtest</a>
+    <a href="#research" data-v="research">Research</a>
     <a href="#screen" data-v="screen">Screen</a>
     <a href="#company" data-v="company">Company</a>
     <a href="#sector" data-v="sector">Sector peers</a>
@@ -258,6 +259,7 @@ function route(){
   if(h==="factors")return viewFactors();
   if(h==="setups")return viewSetups();
   if(h==="backtest")return viewBacktest();
+  if(h==="research")return viewResearch();
   if(h==="news")return viewNews();
   if(h==="method")return viewMethod();
   return viewScreen();
@@ -969,6 +971,65 @@ async function liveSignals(){const L=stList().filter(s=>s.live);if(!L.length)ret
       const st=t.pending?"waiting":t.open?"entered":null;if(!st)return;out.push({s,c,t,st})})});
   return out.sort((a,b)=>b.c.date.localeCompare(a.c.date)||b.c._sc-a.c._sc)}
 
+// ---------------------------------------------------------------- Research: what has worked, for which stocks (weekly)
+async function viewResearch(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading the weekly research…</div>';
+  let R,L=null;try{R=await getJSON("data/research.json")}catch(e){v.innerHTML='<div class="empty">The research appears after the first weekly run (Saturday morning).</div>';return}
+  try{L=await getJSON("data/research_live.json")}catch(e){}
+  if(location.hash.slice(1)!=="research")return;
+  const r2=x=>x==null?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%";
+  const rng=(a,f=r2)=>a&&a.length?`<span class="note">${f(a[0])} to ${f(a[1])}</span>`:"";
+  const tone=x=>x==null?"":x>0.05?"color:var(--good)":x<-0.05?"color:var(--bad)":"";
+  const VER={holds:["p-good","Holds up","Positive in the older 70% and still positive in the newest 30%"],weaker:["p-warn","Weaker","Still positive out of sample, but less than half its in-sample result"],degrades:["p-bad","Degrades","Positive in sample, zero or negative out of sample: likely overfit"],thin:["p-neutral","Too few","Positive in sample, too few out-of-sample trades to judge"],negative:["p-neutral","Negative","Not positive even in sample"]};
+  const vp=k=>{const x=VER[k];return x?`<span class="pill ${x[0]}" title="${esc(x[2])}">${x[1]}</span>`:""};
+  const st=(s,full)=>!s||!s.n?'<span class="note">none</span>':`<b style="${tone(s.avg)}">${r2(s.avg)}R</b> <span class="note">n=${s.n} · win ${pc(s.win)}${full&&s.pf!=null?" · PF "+nf(s.pf,2):""}</span>`;
+  const O=R.overall,E=R.eval,thin=(R.test_n||0)<300;
+  const lmap={};(R.leaves||[]).forEach(l=>lmap[l.path]=l);
+  const lab=sp=>{const f=(R.features[sp[1]]||{}).label||sp[1];return sp[0]==="num"?[`${f} < ${sp[2]}`,`${f} ≥ ${sp[2]}`]:[`${f}: ${sp[2]}`,`${f}: not ${sp[2]}`]};
+  const node=(n,path,txt)=>{const lf=lmap[path];const head=`<span>${esc(txt)}</span> <span class="note">· ${n.n} trades · avg <b style="${tone(n.avg)}">${r2(n.avg)}R</b> · win ${pc(n.win)}</span>`;
+    if(!n.split)return `<li class="rt-leaf"><div>${head}</div>${lf?`<div class="rt-lf">${vp(lf.verdict)} in sample ${st(lf.train)} · out of sample ${st(lf.test)} · <b>p(win) ${pc(lf.prob)}</b>, expected ${r2(lf.exp_r)}R</div>`:""}</li>`;
+    const [a,b]=lab(n.split);return `<li><details${path.length<2?" open":""}><summary>${head}</summary><ul>${node(n.left,path+"L",a)}${node(n.right,path+"R",b)}</ul></details></li>`};
+  const pv=L&&L.predictions||[];
+  const hint=p=>p.alert?'<span class="pill p-good">Consider</span>':(p.exp_r>0&&["holds","weaker"].includes(p.verdict)?'<span class="pill p-warn">Marginal</span>':'<span class="pill p-neutral">Skip</span>');
+  const FV=R.factor_value||[];
+  v.innerHTML=`<style>.rt ul{list-style:none;margin:0;padding-left:16px;border-left:1px solid var(--line)}.rt>ul{padding-left:0;border:0}.rt li{margin:6px 0}.rt summary{cursor:pointer}.rt-lf{margin:4px 0 0 2px;font-size:13px}.rt-leaf>div:first-child::before{content:"▸ ";color:var(--muted)}
+   .rcmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.rcmp>div{background:var(--soft);border-radius:8px;padding:10px}.rcmp h4{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}.rcmp p{margin:3px 0;font-size:14px}</style>
+  <div class="grid" style="gap:var(--s4)">
+   <div><h1>Research: what has worked, for which stocks</h1><p class="muted" style="margin:4px 0 0">Every setup across the Nifty 500 since ${esc(R.period[0])}, run through one fixed trade rule and fed to a decision tree that looks for the combination of factors (setup, trend, room to the next level, sector, size and more) that separates good trades from bad. Refit every Saturday. Fitted on the older 70% of dates (to ${esc(R.split_date)}), then tested untouched on the newest 30%.</p>
+    <p class="note">Updated ${esc(R.run)} · ${R.labelled.toLocaleString("en-IN")} trades from ${R.stocks_n||"–"} stocks (${R.long_stocks||0} with 10-year history) · ${esc(R.price_basis||"")}.</p></div>
+   ${thin?`<div class="banner">Evidence is thin: only ${R.test_n} trades in the test period. Treat every number below as a rough guide.</div>`:""}
+   <div class="card"><h3>Overfitting check (70:30)</h3><div class="rcmp">
+     <div><h4>All setups</h4><p>In sample: ${st(O.train,1)}</p><p>Out of sample: ${st(O.test,1)}</p></div>
+     <div><h4>Only the conditions the tree liked</h4><p>In sample: ${st(E.picked_train,1)}</p><p>Out of sample: ${st(E.picked,1)}</p></div>
+     <div><h4>Win probability accuracy (Brier, lower is better)</h4><p>Model ${E.brier!=null?nf(E.brier,4):"–"} vs flat base rate ${E.brier_base!=null?nf(E.brier_base,4):"–"}</p><p class="note">${E.brier!=null&&E.brier<E.brier_base?"The model's probabilities beat a flat guess on unseen dates.":"The model's probabilities do not beat a flat guess on unseen dates: use them with caution."}</p></div></div>
+     <p class="note" style="margin-top:8px">If "in sample" is much better than "out of sample", the pattern was luck in the old data. Conditions below carry a verdict: ${Object.keys(VER).map(vp).join(" ")}</p></div>
+   <div class="card"><h3>Recent setups with model odds</h3>${pv.length?`<div class="tablewrap"><table><thead><tr><th>Setup</th><th>Company</th><th class="hs">Day</th><th class="n">p(win)</th><th class="n">Expected</th><th class="hs">Out of sample</th><th>Verdict</th><th>Hint</th></tr></thead><tbody>${pv.map((p,i)=>`<tr data-i="${i}" style="cursor:pointer"><td><span class="pill ${p.dir>0?"p-good":"p-bad"}">${p.dir>0?"BUY":"SELL"}</span> <span class="note">${esc(PATSHORT[p.pattern]||p.pattern)} · ${p.score}</span></td><td><b class="mono">${esc(p.symbol)}</b></td><td class="mono hs">${esc(p.date.slice(5))}</td><td class="n"><b>${pc(p.prob)}</b><br>${rng(p.prob_ci,pc)}</td><td class="n"><b style="${tone(p.exp_r)}">${r2(p.exp_r)}R</b><br>${rng(p.exp_ci)}</td><td class="hs">${st(p.test)}</td><td>${vp(p.verdict)}</td><td>${hint(p)}</td></tr>`).join("")}</tbody></table></div><p class="note">p(win) is the share of similar past trades that ended positive, pulled toward the overall rate when the group is small (range: 95%). Expected is the average result in R. "Consider" means it meets your model-alert thresholds (expected ≥ ${r2(R.config.alert.min_exp_r)}R, p(win) ≥ ${pc(R.config.alert.min_prob)}, and the condition held up out of sample). Tap a row for the chart.</p>`:'<div class="note">No recent setups yet, or the daily build has not applied this week\'s model.</div>'}</div>
+   <div class="card"><h3>Best conditions</h3><div class="tablewrap"><table><thead><tr><th>When</th><th>In sample (older 70%)</th><th>Out of sample (newest 30%)</th><th class="n">p(win)</th><th class="n">Expected</th><th>Verdict</th></tr></thead><tbody>${R.leaves.map(l=>`<tr><td style="min-width:220px">${l.rules.map(esc).join("<br>")||"All setups"}<div class="note">${(l.dirs||[]).join(" / ")}</div></td><td>${st(l.train)}<br>${rng(l.train.avg_ci)}</td><td>${st(l.test)}<br>${rng(l.test.avg_ci)}</td><td class="n">${pc(l.prob)}<br>${rng(l.prob_ci,pc)}</td><td class="n" style="${tone(l.exp_r)}">${r2(l.exp_r)}R</td><td>${vp(l.verdict)}</td></tr>`).join("")}</tbody></table></div>
+     <p class="note">Each row is a leaf of the tree: a group of at least ${R.config.min_leaf} past trades. Sorted by the out-of-sample result.</p></div>
+   <div class="card"><h3>Decision tree</h3><div class="rt"><ul>${node(R.tree,"","All setups")}</ul></div><p class="note">Splits were chosen on the training dates only. Tap a branch to open it.</p></div>
+   <div class="card"><h3>Which factors add value</h3><div class="tablewrap"><table><thead><tr><th>Factor</th><th class="n">Value</th><th class="n hs">Picked trades out of sample, with / without</th><th>In tree</th></tr></thead><tbody>${FV.map(f=>`<tr><td>${esc(f.label)}</td><td class="n" style="${tone((f.brier_change||0)/5)}">${f.brier_change==null?"–":(f.brier_change>0?"+":"")+nf(f.brier_change,2)}</td><td class="n hs">${r2(f.picked_avg_with)}R / ${r2(f.picked_avg_without)}R <span class="note">n=${f.picked_n_without??"–"}</span></td><td>${f.used?"yes":'<span class="note">no</span>'}</td></tr>`).join("")}</tbody></table></div>
+     <p class="note">Value: how much worse the out-of-sample probability error gets (×1000) when the factor is removed and the tree refit. Positive means the factor helps; near zero means it adds nothing; negative means the tree is better off without it. New factors you add show up here the next Saturday.</p></div>
+   <div class="card"><h3>One factor at a time</h3><label class="btf" style="max-width:320px"><span>Factor</span><select id="rs-f">${(R.single||[]).map((s,i)=>`<option value="${i}">${esc(s.label)}</option>`).join("")}</select></label><div id="rs-s" style="margin-top:10px"></div></div>
+   <div class="card"><h3>By stock and sector</h3><div class="row" style="gap:8px;flex-wrap:wrap"><input id="rs-q" placeholder="Filter symbol or sector" style="max-width:220px"><select id="rs-v"><option value="">All verdicts</option>${Object.entries(VER).map(([k,x])=>`<option value="${k}">${x[1]}</option>`).join("")}</select></div>
+     <div id="rs-sec" style="margin-top:10px"></div><div id="rs-st" style="margin-top:10px"></div>
+     <p class="note">Per-stock numbers are small samples: a stock's own history is a hint, the pooled conditions above are the evidence. "Best condition" is picked on the older dates and its result on the newest dates shown beside it.</p></div>
+   <div class="card"><h3>How the trades are scored</h3><p class="note">Entry when price breaks the pattern high (low for sells) within ${R.label_rule.entry_days} days; stop ${R.label_rule.stop_atr} ATR beyond the pattern or level; half booked at ${R.label_rule.partial_r}R with the stop moved to entry; the rest trailed by ${R.label_rule.trail_atr} ATR; exit after ${R.label_rule.max_days} days. Results include dividends. To test a new parameter, add it to the research factors (ask Claude) and it is scored here from the next weekly run. Settings: <span class="mono">config/research.json</span>.</p></div>
+  </div>`;
+  $("#view").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{const p=pv[+tr.dataset.i];S.focusSetup={sym:p.symbol,date:p.date};
+    S.setupNav={list:pv.map(y=>({sym:y.symbol,date:y.date,sc:y.score,pattern:y.pattern,dir:y.dir})),i:+tr.dataset.i};goCompany(p.symbol)});
+  const single=()=>{const s=(R.single||[])[+$("#rs-f").value];if(!s){$("#rs-s").innerHTML="";return}
+    $("#rs-s").innerHTML=`<div class="tablewrap"><table><thead><tr><th>Value</th><th class="n">Trades</th><th class="n">Avg</th><th class="n hs">95% range</th><th class="n">Win</th><th class="n hs">PF</th></tr></thead><tbody>${s.bands.map(b=>`<tr${b.n<100?' class="note"':""}><td>${esc(b.value)}</td><td class="n">${b.n}</td><td class="n" style="${tone(b.avg)}">${r2(b.avg)}R</td><td class="n hs">${rng(b.avg_ci)}</td><td class="n">${pc(b.win)}</td><td class="n hs">${b.pf==null?"–":nf(b.pf,2)}</td></tr>`).join("")}</tbody></table></div><p class="note">All dates, no split. Grey rows have under 100 trades.</p>`};
+  $("#rs-f").onchange=single;single();
+  const SA=R.stock_attr||{};
+  const stocks=()=>{const q=$("#rs-q").value.trim().toUpperCase(),vf=$("#rs-v").value;
+    const rows=(R.stocks||[]).filter(s=>(!q||s.symbol.includes(q)||((SA[s.symbol]||{}).sector||"").toUpperCase().includes(q))&&(!vf||s.verdict===vf));
+    const sec={};(R.stocks||[]).forEach(s=>{const k=(SA[s.symbol]||{}).sector||"Other";const o=sec[k]||(sec[k]={n:0,sum:0,trn:0,trs:0,ten:0,tes:0});o.n+=s.n;o.sum+=s.n*s.avg;if(s.train&&s.train.n){o.trn+=s.train.n;o.trs+=s.train.n*s.train.avg}if(s.test&&s.test.n){o.ten+=s.test.n;o.tes+=s.test.n*s.test.avg}});
+    const SE=Object.entries(sec).map(([k,o])=>({k,n:o.n,avg:o.sum/o.n,tr:o.trn?o.trs/o.trn:null,te:o.ten?o.tes/o.ten:null,ten:o.ten})).sort((a,b)=>(b.te??-9)-(a.te??-9));
+    $("#rs-sec").innerHTML=`<details><summary style="cursor:pointer;font-weight:600">Sectors (${SE.length})</summary><div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Sector</th><th class="n">Trades</th><th class="n">In sample</th><th class="n">Out of sample</th></tr></thead><tbody>${SE.map(s=>`<tr><td>${esc(s.k)}</td><td class="n">${s.n}</td><td class="n" style="${tone(s.tr)}">${r2(s.tr)}R</td><td class="n" style="${tone(s.te)}">${r2(s.te)}R <span class="note">n=${s.ten}</span></td></tr>`).join("")}</tbody></table></div></details>`;
+    $("#rs-st").innerHTML=`<div class="tablewrap"><table><thead><tr><th>Stock</th><th class="n">Trades</th><th>In sample</th><th>Out of sample</th><th>Verdict</th><th class="hs">Buys / sells</th><th class="hs">Best condition (older dates) → newest dates</th></tr></thead><tbody>${rows.slice(0,150).map(s=>`<tr data-s="${esc(s.symbol)}" style="cursor:pointer"><td><b class="mono">${esc(s.symbol)}</b><div class="note">${esc((SA[s.symbol]||{}).sector||"")}</div></td><td class="n">${s.n}</td><td>${st(s.train)}</td><td>${st(s.test)}</td><td>${vp(s.verdict)}</td><td class="hs">${st(s.buy)}<br>${st(s.sell)}</td><td class="hs note" style="min-width:200px">${(s.best_leaf_rules||[]).map(esc).join(" · ")||"–"}${s.best_leaf_n?` <br>older: ${r2(s.best_leaf_avg)}R n=${s.best_leaf_n} → newest: ${s.best_leaf_test&&s.best_leaf_test.n?r2(s.best_leaf_test.avg)+"R n="+s.best_leaf_test.n:"none"}`:""}</td></tr>`).join("")}</tbody></table></div>${rows.length>150?`<p class="note">Showing 150 of ${rows.length}. Filter to narrow.</p>`:""}`;
+    $("#rs-st").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>goCompany(tr.dataset.s))};
+  $("#rs-q").oninput=stocks;$("#rs-v").onchange=stocks;stocks();
+}
 async function viewNews(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
   let ev=[];try{ev=await getJSON("data/events.json")}catch(e){}

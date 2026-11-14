@@ -1,6 +1,9 @@
 """Daily prices.
 
-* Backfill / weekly re-sync: Yahoo Finance via yfinance (split-adjusted closes, full history).
+* Backfill / weekly re-sync: Yahoo Finance via yfinance, full history. open/high/low/close are adjusted for splits
+  and bonus issues (what charts show). The "adj" column is Yahoo's dividend factor (Adj Close / Close): multiply
+  prices by it for total-return figures (the backtest and research do this).
+* A daily close that jumps like a split or bonus triggers a Yahoo re-download for that stock the same day.
 * Daily append: NSE's official end-of-day bhavcopy (public archive file).
 """
 from __future__ import annotations
@@ -17,7 +20,7 @@ from common import PRICES, UA, yf_symbol
 BHAV_URL = "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_{d}_F_0000.csv.zip"
 
 
-COLS = ["open", "high", "low", "close", "volume"]
+COLS = ["open", "high", "low", "close", "volume", "adj"]
 
 
 def price_path(sym):
@@ -32,6 +35,7 @@ def load_prices(sym) -> pd.DataFrame:
     for c in COLS:
         if c not in df:
             df[c] = float("nan")
+    df["adj"] = df["adj"].fillna(1.0)
     return df[~df.index.duplicated(keep="last")][COLS]
 
 
@@ -42,6 +46,7 @@ def save_prices(sym, df: pd.DataFrame):
     for c in ("open", "high", "low", "close"):
         out[c] = out[c].round(2)
     out["volume"] = out["volume"].fillna(0).astype("int64")
+    out["adj"] = out["adj"].fillna(1.0).round(6)
     out.to_csv(price_path(sym), date_format="%Y-%m-%d")
 
 
@@ -57,11 +62,13 @@ def backfill_yf(symbols: list[str], period="max", batch=50):
         for s, t in zip(chunk, tickers):
             try:
                 d = data[t] if len(tickers) > 1 else data
-                d = d[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
+                d = d[["Open", "High", "Low", "Close", "Volume"] + (["Adj Close"] if "Adj Close" in d else [])].dropna(subset=["Close"])
                 if d.empty:
                     continue
+                d = d.copy()
+                d["adj"] = (d["Adj Close"] / d["Close"]).clip(0.01, 1.5) if "Adj Close" in d else 1.0
                 # yfinance's Close here is split-adjusted only; scale O/H/L consistently with it
-                d = d.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
+                d = d.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"}).drop(columns=["Adj Close"], errors="ignore")
                 d.index = pd.to_datetime(d.index).tz_localize(None).normalize()
                 if period != "max":  # merge recent rows into stored history
                     old = load_prices(s)
@@ -117,7 +124,20 @@ def append_bhavcopies(symbols: list[str], lookback_days=10) -> list[str]:
                     row = row.iloc[0]
                 df = load_prices(s)
                 df.loc[pd.Timestamp(d)] = [float(row["open"]), float(row["high"]), float(row["low"]),
-                                           float(row["close"]), int(row["volume"])]
+                                           float(row["close"]), int(row["volume"]), 1.0]
                 save_prices(s, df)
                 last_dates[s] = d
     return fetched
+
+
+def corporate_action_suspects(symbols: list[str]) -> list[str]:
+    """Stocks whose latest close moved like a split or bonus (more than -40% / +70% in a day) and need re-adjusting."""
+    out = []
+    for s in symbols:
+        df = load_prices(s)
+        if len(df) < 2:
+            continue
+        r = df["close"].iloc[-1] / df["close"].iloc[-2]
+        if r < 0.6 or r > 1.7:
+            out.append(s)
+    return out

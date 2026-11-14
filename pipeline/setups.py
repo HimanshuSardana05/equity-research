@@ -170,6 +170,7 @@ def find_setups(prices: pd.DataFrame, hist: dict, rules: dict | None = None) -> 
     pos = {t: i for i, t in enumerate(dates)}
     lv_by_date = dict(zip(hist["t"], hist["lv"]))
     closes = d["close"].to_numpy()
+    adjc = closes * (d["adj"].fillna(1.0).to_numpy() if "adj" in d else 1.0)  # dividend-adjusted, for forward returns
     out = []
     for t in hist["t"]:
         i = pos.get(t)
@@ -198,7 +199,7 @@ def find_setups(prices: pd.DataFrame, hist: dict, rules: dict | None = None) -> 
             fwd = {}
             for hz in HORIZONS:
                 if i + hz < len(closes):
-                    fwd[f"r{hz}"] = round(float(closes[i + hz] / closes[i] - 1), 4)
+                    fwd[f"r{hz}"] = round(float(adjc[i + hz] / adjc[i] - 1), 4)
             out.append({"date": t, "pattern": key, "dir": direction, "kind": kind, "level": label,
                         "lo": round(zlo, 2), "hi": round(zhi, 2), "close": round(float(closes[i]), 2),
                         "strength": round(strength, 2), "vol": None if vol_ratio is None else round(vol_ratio, 2),

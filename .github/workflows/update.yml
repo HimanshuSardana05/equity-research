@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "daily | weekly | full | analyze"
+        description: "daily | weekly | full | analyze | research"
         default: daily
   push:
     branches: [main]

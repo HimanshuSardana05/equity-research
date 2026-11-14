@@ -104,10 +104,11 @@ def _fingerprint(c: pd.DataFrame) -> list:
     return [c["time"].tolist(), [round(x, 2) for x in c["close"].tolist()]]
 
 
-def history_for(sym: str, prices: pd.DataFrame) -> dict:
+def history_for(sym: str, prices: pd.DataFrame, sets=None, cache=None, hist_bars=None) -> dict:
     """Per-bar levels for the last HIST_BARS candles, cached and extended incrementally."""
-    CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / f"{sym.replace('&', '_')}.json"
+    sets, cache_dir, HIST = sets or SETS, cache or CACHE, hist_bars or HIST_BARS
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    path = cache_dir / f"{sym.replace('&', '_')}.json"
     cache = {}
     if path.exists():
         try:
@@ -115,13 +116,13 @@ def history_for(sym: str, prices: pd.DataFrame) -> dict:
         except Exception:
             cache = {}
     out = {}
-    for key, cls, bars in SETS:
-        full = _candles(prices, bars + HIST_BARS)
+    for key, cls, bars in sets:
+        full = _candles(prices, bars + HIST)
         n = len(full)
         if n < 60:
             out[key] = {"t": [], "lv": []}
             continue
-        start = max(30, n - HIST_BARS)
+        start = max(30, n - HIST)
         times = full["time"].tolist()
         closes = [round(x, 2) for x in full["close"].tolist()]
         old = cache.get(key) if cache.get("v") == CACHE_VERSION else None
@@ -197,3 +198,49 @@ def precompute(symbols: list[str], workers: int | None = None):
                 errs += 1
                 print("levels fail", sym, err)
     print(f"levels history ready for {len(symbols) - errs}/{len(symbols)}")
+
+
+# ---------------------------------------------------------------- long history for the weekly research run
+LONG_BARS = 2500          # about ten trading years
+LONG_CACHE = ROOT / "data" / "cache" / "levels_long"
+LONG_SETS = (("daily", DailyLevelIndicator, 600),)
+
+
+def long_history(sym: str, prices: pd.DataFrame) -> dict:
+    return history_for(sym, prices, LONG_SETS, LONG_CACHE, LONG_BARS).get("daily") or {}
+
+
+def _warm_long(sym: str):
+    from prices import load_prices
+    import time
+    t = time.time()
+    try:
+        long_history(sym, load_prices(sym))
+        return sym, None, time.time() - t
+    except Exception as e:
+        return sym, str(e)[:200], time.time() - t
+
+
+def precompute_long(symbols: list[str], budget_s: float = 3000, workers: int | None = None) -> list[str]:
+    """Extend the 10-year level history, stopping new work after budget_s seconds; the rest continues next run.
+    Returns the symbols whose long history is complete."""
+    import time
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    workers = workers or max(1, (os.cpu_count() or 2))
+    t0, done = time.time(), []
+    with ProcessPoolExecutor(workers) as ex:
+        pending = list(symbols)
+        futs = {}
+        while pending or futs:
+            while pending and len(futs) < workers * 2 and time.time() - t0 < budget_s:
+                s_ = pending.pop(0)
+                futs[ex.submit(_warm_long, s_)] = s_
+            if not futs:
+                break
+            f = next(as_completed(list(futs)))
+            sym, err, _ = f.result()
+            futs.pop(f)
+            if not err:
+                done.append(sym)
+    print(f"long level history: {len(done)}/{len(symbols)} stocks done in {time.time() - t0:.0f}s", flush=True)
+    return done

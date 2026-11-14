@@ -1,0 +1,8 @@
+{
+  "_help": "Weekly research settings. min_leaf: fewest trades a condition needs. max_depth: how many conditions can be stacked. test_share: newest share of dates kept out of fitting (0.3 = 70:30). prior: trades of weight pulling small groups toward the overall average. alert: when a recent setup becomes a model alert.",
+  "min_leaf": 150,
+  "max_depth": 4,
+  "test_share": 0.3,
+  "prior": 40,
+  "alert": {"min_exp_r": 0.15, "min_prob": 0.5, "require_oos_positive": true}
+}

@@ -101,7 +101,8 @@ def main(send: bool) -> None:
         print("no alerts feed")
         return
     sent = set(json.loads(SENT.read_text())) if SENT.exists() else set()
-    items = feed.get("signals", []) + feed.get("alerts", [])  # live strategy signals first, then setups
+    # live strategy signals first, then weekly-model picks, then setups
+    items = feed.get("signals", []) + feed.get("model_signals", []) + feed.get("alerts", [])
     fresh = [a for a in items if a["id"] not in sent][: int(al.get("max_per_run") or 25)]
     print(f"{len(fresh)} new alert(s) for {feed.get('as_of')}")
     for a in fresh:

@@ -10,6 +10,7 @@ Logic hierarchy (research aid, not investment advice):
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from collections import defaultdict
 from datetime import timedelta
 
@@ -25,6 +26,7 @@ from setups import find_setups, baseline, summarize, load_rules, PATTERNS
 from alerts import build_alerts
 from signals import candidates, live_signals, COLS as CAND_COLS, VOL_FLOOR
 from setups import score as setup_score
+from research import live_predictions
 
 
 def _f(x):
@@ -283,6 +285,7 @@ def percentile(series, x):
 # --------------------------------------------------------------------------- main build
 _BASE = {"r5": [], "r10": [], "r20": []}
 RULES = load_rules()
+CACHE_DIR = Path(__file__).resolve().parent.parent / "data" / "cache"
 _CANDS = {}
 
 
@@ -659,6 +662,11 @@ def build_all(universe: list[dict]):
         for r in _CANDS.get(sym, []):
             r[0] = sidx[sym]
             cands.append(r)
+    # every candidate (no volume floor) plus stock traits, for the weekly research run
+    write_json(CACHE_DIR / "candidates_all.json", {"as_of": dates[-1] if dates else None, "cols": CAND_COLS, "syms": syms,
+        "patterns": pkeys, "rows": cands,
+        "stocks": {s_: {"industry": companies[s_].get("industry"), "mcap": (companies[s_].get("metrics") or {}).get("mcap"),
+                        "beta": (companies[s_].get("metrics") or {}).get("beta"), "name": companies[s_].get("name")} for s_ in syms}})
     cal = sorted({d for c in companies.values() for d in (c.get("price") or {}).get("t", [])[-700:]})
     cal = [d for d in cal if not dates or d >= dates[0]]
     write_json(SITE_DATA / "backtest.json", {
@@ -675,6 +683,19 @@ def build_all(universe: list[dict]):
     score_of = lambda r: setup_score({"zs": r[ci["zs"]] or 0, "strength": r[ci["strength"]], "vol": r[ci["vol"]], "trend": r[ci["trend"]]}, RULES)
     feed = build_alerts(recent, RULES, dates[-1] if dates else None)
     feed["signals"] = live_signals(recent_c, syms, score_of, dates[-1] if dates else None, recent_dates)
+    # model (weekly research tree) probabilities for recent setups
+    try:
+        lp = live_predictions(recent_c, CAND_COLS, syms, pkeys)
+    except Exception as e:
+        print("research predictions fail", repr(e))
+        lp = None
+    if lp:
+        write_json(SITE_DATA / "research_live.json", {"as_of": dates[-1] if dates else None, "cal": recent_dates, **lp})
+        feed["model_signals"] = [
+            {"id": f"model|{p['symbol']}|{p['date']}|{p['pattern']}", "symbol": p["symbol"], "date": p["date"],
+             "text": f"{'BUY' if p['dir'] > 0 else 'SELL'} model {p['symbol']} · {PATTERNS[p['pattern']][0]} {p['date']} · "
+                     f"p(win) {round(p['prob'] * 100)}% · exp {p['exp_r']:+.2f}R (n={p['n']})"}
+            for p in lp["predictions"] if p["alert"] and p["date"] == (dates[-1] if dates else None)]
     write_json(SITE_DATA / "alerts.json", feed)
     write_json(SITE_DATA / "sectors.json", sectors)
     feed = []
