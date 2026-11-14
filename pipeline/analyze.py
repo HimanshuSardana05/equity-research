@@ -420,28 +420,43 @@ def spearman(a, b):
 
 
 def verdict(c: dict, sec: dict, reg: dict) -> dict:
+    """Blend three valuation signals; each is weighted by how much evidence stands behind it.
+
+    +ve signal = expensive, -ve = cheap.
+      DCF       (weight 0.45): price-implied growth minus supportable growth (Damodaran reverse DCF).
+      History   (weight up to 0.20, scaled by years of multiple history: 2 years of PE data says little).
+      Peers     (weight 0.35): PE premium over the sector's quality/growth-justified PE.
+    A guard-rail then applies: a price far outside even the bull/bear DCF value can't be called "fair".
+    """
     m, dcf = c["metrics"], c.get("dcf") or {}
-    reasons, signals = [], []
-    pe, spe = m.get("pe"), sec.get("median_pe")
+    reasons, parts = [], []
+    pe, spe, price = m.get("pe"), sec.get("median_pe"), m.get("price")
     ig, ge = dcf.get("implied_growth"), dcf.get("expected_growth")
     if ig is not None and ge is not None:
         gap = ig - ge
-        signals.append(_clip(gap / 0.08, -1.5, 1.5) * 0.4)
+        parts.append({"name": "Reverse DCF", "w": 0.45, "s": _clip(gap / 0.06, -2, 2),
+                      "detail": f"implied {ig*100:.0f}% vs supportable {ge*100:.0f}% growth"})
         if gap > 0.04:
             reasons.append(f"Price implies ~{ig*100:.0f}% a year profit growth for {dcf['years']} years, versus ~{ge*100:.0f}% that history and analysts support (reverse DCF at {dcf['cost_of_equity']*100:.1f}% cost of equity).")
         elif gap < -0.03:
             reasons.append(f"Price implies only ~{ig*100:.0f}% a year growth, below the ~{ge*100:.0f}% that history and analysts support, so expectations look modest.")
     pct = m.get("pe_pct")
-    if pct is not None and pe:
-        signals.append((pct - 0.5) * 2 * 0.25)
-        hs = c["history_stats"].get("pe", {})
+    hs = c["history_stats"].get("pe", {})
+    if pct is not None and pe and hs.get("since"):
+        yrs = (pd.Timestamp(m["price_date"]) - pd.Timestamp(hs["since"])).days / 365.25
+        w = 0.20 * _clip(yrs / 7, 0, 1)
+        if w > 0.03:
+            parts.append({"name": "Own history", "w": w, "s": (pct - 0.5) * 2,
+                          "detail": f"PE at {pct*100:.0f}th percentile of {yrs:.1f} years"})
+        span = f"the last {yrs:.0f} years" if yrs >= 1.5 else "the past year"
         if pct >= 0.8:
-            reasons.append(f"PE of {pe:.0f} is in the top {100-pct*100:.0f}% of its own range since {hs.get('since','')[:4]} (median {hs.get('median',0):.0f}).")
+            reasons.append(f"PE of {pe:.0f} is near the top of its range over {span} (median {hs.get('median',0):.0f}).")
         elif pct <= 0.2:
-            reasons.append(f"PE of {pe:.0f} is near the bottom of its own range since {hs.get('since','')[:4]} (median {hs.get('median',0):.0f}).")
+            reasons.append(f"PE of {pe:.0f} is near the bottom of its range over {span} (median {hs.get('median',0):.0f})" + (", though that is a short history to judge by." if yrs < 5 else "."))
     rg = reg.get(c["symbol"])
     if rg:
-        signals.append(_clip(rg["residual"] / 0.5, -1.5, 1.5) * 0.35)
+        parts.append({"name": "Peers", "w": 0.35, "s": _clip(rg["residual"] / 0.4, -1.5, 1.5),
+                      "detail": f"PE {pe:.0f} vs peer-justified {rg['justified_pe']:.0f}" if pe else ""})
         if pe and spe:
             prem = pe / spe - 1
             qual = "ROCE" if not c["financial"] else "ROE"
@@ -463,13 +478,23 @@ def verdict(c: dict, sec: dict, reg: dict) -> dict:
             reasons.append(f"Since {d['from'][:4]}, most of the {d['price_cagr']*100:.0f}% a year price gain came from re-rating (PE {d['pe_from']:.0f} → {d['pe_to']:.0f}), not earnings growth ({d['earnings_cagr']*100:.0f}% a year).")
         elif se > 0.8:
             reasons.append(f"Since {d['from'][:4]}, the price gain has been earned: earnings grew {d['earnings_cagr']*100:.0f}% a year while PE moved {d['pe_from']:.0f} → {d['pe_to']:.0f}.")
-    if not signals:
-        return {"label": "Insufficient data", "score": None, "reasons": reasons or ["Not enough profitable history to value."]}
-    score = float(sum(signals) / (0.4 + 0.25 + 0.35) * (1.0 if len(signals) == 3 else 1.3))
+    if not parts:
+        return {"label": "Insufficient data", "score": None, "reasons": reasons or ["Not enough profitable history to value."], "parts": []}
+    W = sum(p["w"] for p in parts)
+    score = float(sum(p["w"] * p["s"] for p in parts) / W)
     label = "Looks expensive" if score > 0.35 else "Looks cheap" if score < -0.35 else "Around fair value"
+    fv = dcf.get("fair_value") or {}
+    if price and fv.get("bull") and price > 1.5 * fv["bull"] and label != "Looks expensive":
+        label = "Looks expensive"
+        reasons.insert(0, f"Price ₹{price:,.0f} is more than 1.5x even the optimistic DCF value (₹{fv['bull']:,.0f}), so other signals can't make it look fair.")
+    elif price and fv.get("bear") and fv["bear"] > 0 and price < fv["bear"] / 1.5 and label != "Looks cheap":
+        label = "Looks cheap"
+        reasons.insert(0, f"Price ₹{price:,.0f} is below two-thirds of even the cautious DCF value (₹{fv['bear']:,.0f}).")
     if m.get("pe") is None:
         label = "Loss-making / not meaningful"
-    return {"label": label, "score": score, "reasons": reasons, "signals": len(signals)}
+    for p in parts:
+        p["share"] = p["w"] / W
+    return {"label": label, "score": score, "reasons": reasons, "signals": len(parts), "parts": parts}
 
 
 def build_all(universe: list[dict]):

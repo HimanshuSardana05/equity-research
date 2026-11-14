@@ -68,7 +68,11 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .card > h3{margin-bottom:var(--s3)}
 .row{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center}
 .between{justify-content:space-between}
-.chart{height:340px;width:100%}
+.chart{height:340px;width:100%;position:relative}
+/* lightweight-charts lays itself out with an internal <table>: keep the page table styles off it */
+.chart table{width:auto!important;font-size:inherit!important}
+.chart td,.chart th{padding:0!important;border:0!important;min-width:0!important;max-width:none!important;white-space:nowrap!important;background:none!important;position:static!important}
+.chart tr:hover{background:none!important}
 .chart.sm{height:240px}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
 .pill .sh{display:none}
@@ -201,7 +205,7 @@ function mkChart(el,opts={}){
   const c=LightweightCharts.createChart(el,{autoSize:true,
     layout:{background:{type:"solid",color:"transparent"},textColor:css("--muted"),fontFamily:"IBM Plex Mono, monospace",fontSize:11},
     grid:{vertLines:{color:css("--chart-grid")},horzLines:{color:css("--chart-grid")}},
-    rightPriceScale:{borderColor:css("--line")},timeScale:{borderColor:css("--line")},
+    rightPriceScale:{borderColor:css("--line")},timeScale:{borderColor:css("--line"),minBarSpacing:0.001,fixLeftEdge:true,fixRightEdge:true,lockVisibleTimeRangeOnResize:true},
     crosshair:{mode:0},localization:{priceFormatter:opts.fmt||(p=>nf(p,p<100?2:0))},...opts.extra});
   S.charts.push(c);return c}
 const ser=(t,v)=>{const o=[];for(let i=0;i<t.length;i++)if(v[i]!=null&&isFinite(v[i]))o.push({time:t[i],value:v[i]});return o};
@@ -321,7 +325,7 @@ async function viewCompany(sym){
    <div class="grid g2">
     <div class="card"><div class="row between"><h3>Price</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}</div></div><div class="chart" id="ch-price"></div></div>
     <div class="card"><h3>Why it looks ${esc((vd.label||"").replace("Looks ","").toLowerCase()||"this way")}</h3>
-     ${vd.signals?`<p class="note" style="margin-top:0">Based on ${vd.signals} of 3 signals (reverse DCF, own history, peer-justified PE)${vd.signals<3?". Fewer signals means lower confidence":""}.</p>`:""}<ul class="reasons">${(vd.reasons||[]).map(r=>`<li>${esc(r)}</li>`).join("")||"<li class='muted'>No strong signal either way.</li>"}</ul>
+     ${vd.signals?`<p class="note" style="margin-top:0">Based on ${vd.signals} of 3 signals (reverse DCF, own history, peer-justified PE)${vd.signals<3?". Fewer signals means lower confidence":""}.</p>`:""}${(vd.parts||[]).length?`<div style="margin:0 0 12px">${vd.parts.map(p=>{const v=Math.max(-1,Math.min(1,p.s/2));return`<div style="margin:6px 0"><div class="row between"><span>${esc(p.name)} <span class="note">· ${(p.share*100).toFixed(0)}% weight</span></span><span class="note">${esc(p.detail)}</span></div><div class="bar" title="left = cheap, right = expensive"><i class="${v<0?"":"neg"}" style="left:${v<0?50+v*50:50}%;width:${Math.abs(v)*50}%"></i><i style="left:50%;width:1px;background:var(--muted)"></i></div></div>`}).join("")}<div class="row between note"><span>← cheap</span><span>expensive →</span></div></div>`:""}<ul class="reasons">${(vd.reasons||[]).map(r=>`<li>${esc(r)}</li>`).join("")||"<li class='muted'>No strong signal either way.</li>"}</ul>
      ${d.fair_value?`<div style="margin-top:var(--s4)"><h3 style="margin-bottom:8px">DCF value per share (FCFE, Damodaran-style)</h3>
       <div class="fv"><div><span class="note">Bear (g ${pct(d.expected_growth-0.04,0)})</span><b>${rs(d.fair_value.bear)}</b></div><div><span class="note">Base (g ${pct(d.expected_growth,0)})</span><b>${rs(d.fair_value.base)}</b></div><div><span class="note">Bull (g ${pct(d.expected_growth+0.04,0)})</span><b>${rs(d.fair_value.bull)}</b></div></div>
       <p class="note" style="margin:8px 0 0">Price ${rs(m.price)} implies ${pct(d.implied_growth,1)} a year profit growth for ${d.years} years at ${pct(d.cost_of_equity,1)} cost of equity and ${pct(d.roe_used,0)} ROE. Expected growth is the median of: ${(d.growth_inputs||[]).map(g=>esc(g[0])+" "+pct(g[1],0)).join(", ")}.</p></div>`:""}
@@ -354,9 +358,13 @@ async function viewCompany(sym){
   const pc=mkChart($("#ch-price"));
   const pl=pc.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2});
   pl.setData(ser(c.price.t,c.price.c));
-  const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];if(r==="Max"){pc.timeScale().fitContent();return}
-    const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];const d0=new Date(end);d0.setFullYear(d0.getFullYear()-y);pc.timeScale().setVisibleRange({from:d0.toISOString().slice(0,10),to:end})};
-  setR("5Y");
+  const t0=c.price.t[0]||"",yrsHist=c.price.t.length?(new Date(c.price.t[c.price.t.length-1])-new Date(t0))/3.156e10:0;
+  $("#rng").querySelectorAll("button").forEach(b=>{const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[b.dataset.r];if(y&&y>yrsHist+0.5)b.hidden=true});
+  const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];
+    if(r==="Max"||!y||y>=yrsHist){pc.timeScale().fitContent();return}
+    const d0=new Date(end);d0.setFullYear(d0.getFullYear()-y);let from=d0.toISOString().slice(0,10);if(from<t0)from=t0;
+    pc.timeScale().setVisibleRange({from,to:end})};
+  const r0=yrsHist>=5?"5Y":"Max";$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.r===r0));setR(r0);
   $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
 
   // valuation chart
@@ -565,7 +573,7 @@ function viewMethod(){
   <p><b>Expected growth</b> is the median of analyst next-year EPS growth, 3-year revenue CAGR and 3-year profit CAGR, capped between −5% and 25%. The bear and bull values use 4 points less and 4 points more growth.</p>
   <p><b>Relative value.</b> Current PE against the company's own history, and against a sector regression of PE on ROCE (ROE for lenders) and growth, which gives a quality-adjusted "justified PE".</p>
   <h2>Verdict</h2>
-  <p>Three signals are blended: implied growth minus expected growth (40%), the PE percentile in its own history (25%), and the premium over the peer-justified PE (35%). "Looks expensive" and "Looks cheap" mark scores beyond ±0.35. Each verdict lists the reasons that drove it, plus context such as an earnings drop that inflates PE, high leverage, or a price rise that came from re-rating rather than earnings.</p>
+  <p>Three signals are blended, each weighted by how much evidence is behind it: the reverse DCF gap between price-implied and supportable growth (45%), the premium over the peer-justified PE (35%), and the PE percentile in the company's own history (up to 20%, scaled down when there are fewer than 7 years of history, because 2 or 3 years of PE data says little). Scores beyond ±0.35 read "Looks expensive" or "Looks cheap". A guard-rail applies on top: a price above 1.5x even the bull-case DCF value is always "Looks expensive", and a price below two-thirds of the bear-case value is always "Looks cheap". The company page shows each signal's direction and weight, plus the reasons behind it.</p>
   <h2>Data and its limits</h2>
   <ul><li>Prices: NSE bhavcopy (official daily file), backfilled from Yahoo Finance with split-adjusted history.</li>
   <li>Fundamentals: Yahoo Finance gives about 4 annual years and recent quarters, plus analyst estimates. For 10 to 12 years, export the company from Screener.in yourself and drop the file in <span class="mono">data/screener_exports/</span>. The app never scrapes Screener, because its terms don't allow it.</li>
