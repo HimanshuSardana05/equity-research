@@ -11,7 +11,7 @@ on:
         default: daily
   push:
     branches: [main]
-    paths: ["data/screener_exports/**", "app/page.html", "pipeline/**"]
+    paths: ["data/screener_exports/**", "app/**", "pipeline/**"]
 
 permissions:
   contents: write
