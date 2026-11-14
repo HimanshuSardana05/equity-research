@@ -9,6 +9,7 @@ shutil.copytree(SITE / "data", dist / "data")
 shutil.copytree(SITE / "assets", dist / "assets")
 shutil.copy(SITE / "manifest.webmanifest", dist / "manifest.webmanifest")
 shutil.copy(SITE / "sw.js", dist / "sw.js")
+shutil.copytree(SITE / "functions", dist / "functions")  # Cloudflare Pages password middleware
 body = (SITE / "page.html").read_text()
 (dist / "index.html").write_text(
     '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
