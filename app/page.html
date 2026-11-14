@@ -180,6 +180,7 @@ footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px 
     <a href="#company" data-v="company">Company</a>
     <a href="#sector" data-v="sector">Sector peers</a>
     <a href="#factors" data-v="factors">Factor vs factor</a>
+    <a href="#setups" data-v="setups">Setups</a>
     <a href="#news" data-v="news">Announcements</a>
     <a href="#method" data-v="method">Method</a>
   </nav>
@@ -243,6 +244,7 @@ function route(){
   if(h.startsWith("sector-"))return viewSector(S.sectorKeys[+h.slice(7)]);
   if(h==="sector")return viewSector(S.lastSector);
   if(h==="factors")return viewFactors();
+  if(h==="setups")return viewSetups();
   if(h==="news")return viewNews();
   if(h==="method")return viewMethod();
   return viewScreen();
@@ -439,10 +441,10 @@ async function viewCompany(sym){
   const rpLabel=()=>{const b=DATA[RP.idx];$("#rp-dt").textContent=b?`${b.time} · ₹${nf(b.close,b.close<100?2:0)}`:"";};
   const rpStop=()=>{clearInterval(RP.timer);RP.timer=null;$("#rp-play").textContent="▶︎";$("#rp-play").title="Play"};
   const rpSet=i=>{i=Math.max(20,Math.min(DATA.length-1,i));const lr=ts.getVisibleLogicalRange();const w=lr?Math.max(30,lr.to-lr.from):120;
-    RP.idx=i;pl.setData(DATA.slice(0,i+1));ts.setVisibleLogicalRange({from:i-w*0.85,to:i+w*0.15});rpLabel();
+    RP.idx=i;pl.setData(DATA.slice(0,i+1));setMk(DATA[i].time);ts.setVisibleLogicalRange({from:i-w*0.85,to:i+w*0.15});rpLabel();
     $("#rp-hint").textContent=i>=DATA.length-1?"Reached the latest candle.":"";if(i>=DATA.length-1)rpStop();redraw()};
-  const rpPick=()=>{rpStop();RP.picking=true;$("#rp-hint").textContent="Tap the chart where the replay should start.";pl.setData(DATA);RP.idx=null;$("#rp-dt").textContent="";redraw()};
-  const rpOn=on=>{RP.on=on;$("#rp").hidden=!on;$("#rpbtn").classList.toggle("on",on);if(on)rpPick();else{rpStop();RP.picking=false;RP.idx=null;pl.setData(DATA);const b=$("#rng button.on");if(b)setR(b.dataset.r);redraw()}};
+  const rpPick=()=>{rpStop();RP.picking=true;$("#rp-hint").textContent="Tap the chart where the replay should start.";pl.setData(DATA);setMk();RP.idx=null;$("#rp-dt").textContent="";redraw()};
+  const rpOn=on=>{RP.on=on;$("#rp").hidden=!on;$("#rpbtn").classList.toggle("on",on);if(on)rpPick();else{rpStop();RP.picking=false;RP.idx=null;pl.setData(DATA);setMk();const b=$("#rng button.on");if(b)setR(b.dataset.r);redraw()}};
   pc.subscribeClick(p=>{if(!RP.on||!RP.picking||p.logical==null)return;RP.picking=false;rpSet(Math.round(p.logical))});
   $("#rpbtn").onclick=()=>rpOn(!RP.on);$("#rp-exit").onclick=()=>rpOn(false);$("#rp-pick").onclick=rpPick;
   const rpStart=()=>{if(RP.idx==null){RP.picking=false;rpSet(DATA.length-120)}};
@@ -450,6 +452,9 @@ async function viewCompany(sym){
   const rpRun=()=>{clearInterval(RP.timer);RP.timer=setInterval(()=>{if(!rpEl.isConnected){clearInterval(RP.timer);return}rpSet(RP.idx+1)},+$("#rp-speed").value)};
   $("#rp-play").onclick=()=>{if(RP.timer){rpStop();return}rpStart();if(RP.idx>=DATA.length-1)return;$("#rp-play").textContent="⏸";$("#rp-play").title="Pause";rpRun()};
   $("#rp-speed").onchange=()=>{if(RP.timer)rpRun()};
+  const SU=(c.setups||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  const setMk=upto=>{try{pl.setMarkers(SU.filter(x=>!upto||x.date<=upto).map(x=>({time:x.date,position:x.dir>0?"belowBar":"aboveBar",color:x.dir>0?css("--good"):css("--bad"),shape:x.dir>0?"arrowUp":"arrowDown",text:innerWidth<700?"":PATSHORT[x.pattern]+(x.kind==="break"?" ↗":"")})))}catch(e){}};
+  setMk();
   const fsCard=$("#ch-price").closest(".card");
   const fsSet=on=>{fsCard.classList.toggle("fs",on);document.body.classList.toggle("fs-on",on);$("#fsbtn").textContent=on?"✕":"⤢";$("#fsbtn").title=on?"Exit full screen":"Full screen";redraw()};
   $("#fsbtn").onclick=async()=>{const on=!fsCard.classList.contains("fs");fsSet(on);
@@ -462,6 +467,11 @@ async function viewCompany(sym){
     const d0=new Date(end);d0.setFullYear(d0.getFullYear()-y);let from=d0.toISOString().slice(0,10);if(from<t0)from=t0;
     pc.timeScale().setVisibleRange({from,to:end})};
   const r0=hasOHLC?(yrsHist>=1?"1Y":"Max"):(yrsHist>=5?"5Y":"Max");$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.r===r0));setR(r0);
+  if(S.focusSetup&&S.focusSetup.sym===sym){const f=S.focusSetup;S.focusSetup=null;const i=IDX[f.date];
+    if(i!=null){pc.timeScale().setVisibleLogicalRange({from:i-90,to:i+30});const x=SU.find(z=>z.date===f.date);
+      if(x){const ln=pl.createPriceLine({price:x.dir>0?x.lo:x.hi,color:x.dir>0?css("--good"):css("--bad"),lineWidth:2,lineStyle:0,axisLabelVisible:true,title:"Setup level"});
+        $("#ch-price").closest(".card").insertAdjacentHTML("afterbegin",`<div class="banner" style="margin-bottom:8px">${esc(f.date)}: ${esc(PATNAME[x.pattern])} · ${esc(x.level)} ${nf(x.lo,x.lo<100?2:0)}${x.hi!==x.lo?"–"+nf(x.hi,x.hi<100?2:0):""} · score ${x.score}</div>`)}}
+    setTimeout(()=>$("#ch-price").scrollIntoView({block:"center"}),50)}
   $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b||!b.dataset.r)return;$("#rng").querySelectorAll("button[data-r]").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
 
   // valuation chart
@@ -644,6 +654,47 @@ function scatter(xk,yk,ind,logY){
 }
 
 /* ================= NEWS ================= */
+
+const PATNAME={bull_engulf:"Bullish engulfing",bear_engulf:"Bearish engulfing",bull_harami:"Bullish harami",bear_harami:"Bearish harami",piercing:"Piercing line",dark_cloud:"Dark cloud cover",morning_star:"Morning star",evening_star:"Evening star"};
+const PATSHORT={bull_engulf:"Engulf",bear_engulf:"Engulf",bull_harami:"Harami",bear_harami:"Harami",piercing:"Pierce",dark_cloud:"DCC",morning_star:"M-star",evening_star:"E-star"};
+async function setupsData(){if(!S.setups)S.setups=getJSON("data/setups.json");return S.setups}
+async function viewSetups(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading setups…</div>';
+  let D;try{D=await setupsData()}catch(e){v.innerHTML='<div class="empty">Setups appear after the next daily build.</div>';return}
+  if(location.hash!=="#setups")return;
+  const P=D.patterns||{},dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
+  const stat={};(D.stats||[]).forEach(r=>{stat[r.pattern+"|"+r.kind]=r});
+  v.innerHTML=`<div class="grid" style="gap:var(--s4)">
+   <div><h1>Setups: candle patterns at levels</h1><p class="muted" style="margin:4px 0 0">A pattern counts only when it forms at a level your LevelIndicator already showed the day before: bullish patterns holding support or breaking resistance, bearish ones rejected at resistance or breaking support. No lookahead.</p></div>
+   <div class="row">
+    <select id="su-dir" aria-label="Direction"><option value="">Bullish and bearish</option><option value="1">Bullish only</option><option value="-1">Bearish only</option></select>
+    <select id="su-pat" aria-label="Pattern"><option value="">All patterns</option>${Object.entries(P).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select>
+    <select id="su-kind" aria-label="Level interaction"><option value="">Tests and breaks</option><option value="test">Level tests (hold / rejection)</option><option value="break">Breakouts / breakdowns</option></select>
+    <select id="su-score" aria-label="Minimum score"><option value="0">Any score</option><option value="40">Score 40+</option><option value="60" selected>Score 60+</option></select>
+    <select id="su-day" aria-label="Days"><option value="1">Latest day (${esc(dates[0]||"")})</option><option value="5" selected>Last 5 trading days</option><option value="10">Last 10 trading days</option></select>
+    <span class="note" id="su-n"></span>
+   </div>
+   <div id="su-t"></div>
+   <div class="card"><h3>Backtest: which pattern + level combinations worked</h3>
+    <p class="note" style="margin-top:0">Every setup over the last two years across the Nifty 500 (${nf(D.total||0,0)} signals since ${esc(D.window_from||"")}). Returns are measured in the pattern's direction from the signal day's close, so a positive number means the move went the expected way. "Base" is the same measure on every day, so a combo is only useful if it beats its base. Fewer than 30 signals is too few to trust.</p>
+    <div id="su-s"></div></div>
+  </div>`;
+  const pill=(r)=>`<span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(P[r.pattern]||r.pattern)}</span>`;
+  const pc=x=>x==null?"–":(x>0?"+":"")+(x*100).toFixed(1)+"%";
+  const draw=()=>{
+    const dir=$("#su-dir").value,pat=$("#su-pat").value,kind=$("#su-kind").value,min=+$("#su-score").value,nd=+$("#su-day").value;
+    const from=dates[Math.min(nd,dates.length)-1]||"";
+    const rows=D.recent.filter(r=>r.date>=from&&(!dir||r.dir==+dir)&&(!pat||r.pattern===pat)&&(!kind||r.kind===kind)&&r.score>=min);
+    $("#su-n").textContent=`${rows.length} setup${rows.length===1?"":"s"}`;
+    $("#su-t").innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Company</th><th>Pattern</th><th class="hs">At level</th><th class="n">Score</th><th class="n hs">Volume</th><th class="n">Hit 10d</th></tr></thead><tbody>${rows.map(r=>{const st=stat[r.pattern+"|"+r.kind];return`<tr data-s="${esc(r.symbol)}" data-d="${esc(r.date)}" style="cursor:pointer"><td class="mono">${esc(r.date.slice(5))}</td><td>${nameCell(r)}</td><td>${pill(r)}<div class="note">${esc(r.level)}</div></td><td class="hs mono">${nf(r.lo,r.lo<100?2:0)}${r.hi!==r.lo?"–"+nf(r.hi,r.hi<100?2:0):""}</td><td class="n"><b>${r.score}</b></td><td class="n hs">${r.vol==null?"–":r.vol.toFixed(1)+"x"}</td><td class="n" title="${st?st.n10+" past signals":""}">${st&&st.hit10!=null?(st.hit10*100).toFixed(0)+"%":"–"}</td></tr>`}).join("")}</tbody></table></div>`
+      :`<div class="empty">No setups match these filters. Try a lower score or more days.</div>`;
+    $("#su-t").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>{S.focusSetup={sym:tr.dataset.s,date:tr.dataset.d};goCompany(tr.dataset.s)});
+    const st=(D.stats||[]).filter(r=>r.kind!=="all"&&(!dir||r.dir==+dir)&&(!pat||r.pattern===pat)&&(!kind||r.kind===kind)).sort((a,b)=>((b.avg10??-1)-(b.base10??0))-((a.avg10??-1)-(a.base10??0)));
+    const bh=k=>D.base_up_rate&&D.base_up_rate[k]!=null?D.base_up_rate[k]:null;
+    $("#su-s").innerHTML=st.length?`<div class="tablewrap"><table><thead><tr><th>Pattern</th><th>At level</th><th class="n">Signals</th><th class="n">Hit 5d</th><th class="n">Hit 10d</th><th class="n hs">Hit 20d</th><th class="n">Avg 10d</th><th class="n hs">Base 10d</th><th class="n hs">Hit 10d, score 60+</th></tr></thead><tbody>${st.map(r=>{const b10=bh("r10"),bhit=b10==null?null:(r.dir>0?b10:1-b10);const good=r.avg10!=null&&r.base10!=null&&r.avg10>r.base10&&r.hit10>(bhit??0.5);return`<tr${r.n<30?' style="opacity:.6"':""}><td>${pill(r)}</td><td>${r.kind==="test"?(r.dir>0?"Held support":"Rejected at resistance"):(r.dir>0?"Broke resistance":"Broke support")}</td><td class="n">${r.n}</td><td class="n">${r.hit5==null?"–":(r.hit5*100).toFixed(0)+"%"}</td><td class="n"><b style="color:${good?"var(--good)":"inherit"}">${r.hit10==null?"–":(r.hit10*100).toFixed(0)+"%"}</b></td><td class="n hs">${r.hit20==null?"–":(r.hit20*100).toFixed(0)+"%"}</td><td class="n">${pc(r.avg10)}</td><td class="n hs">${pc(r.base10)}</td><td class="n hs">${r.hit10_hi==null?"–":(r.hit10_hi*100).toFixed(0)+"% ("+r.n10_hi+")"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Green hit rate = beat both the base return and the base hit rate (${bh("r10")==null?"–":(bh("r10")*100).toFixed(0)}% of all 10-day periods rose). Faded rows have fewer than 30 signals. Past hit rates are a guide, not a forecast.</p>`:"";
+  };
+  ["su-dir","su-pat","su-kind","su-score","su-day"].forEach(id=>$("#"+id).onchange=draw);draw();
+}
 async function viewNews(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
   let ev=[];try{ev=await getJSON("data/events.json")}catch(e){}

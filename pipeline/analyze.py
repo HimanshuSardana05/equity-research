@@ -20,7 +20,8 @@ from common import CONFIG, FUND, SITE_DATA, is_financial, now_iso, read_json, wr
 from events import load_events
 from fundamentals import fiscal_years
 from prices import load_prices
-from levels import compute_levels_full, precompute
+from levels import compute_levels_full, precompute, history_for
+from setups import find_setups, baseline, summarize, PATTERNS
 
 
 def _f(x):
@@ -277,6 +278,22 @@ def percentile(series, x):
 
 
 # --------------------------------------------------------------------------- main build
+_BASE = {"r5": [], "r10": [], "r20": []}
+
+
+def _setups(sym, prices):
+    try:
+        h = history_for(sym, prices).get("daily") or {}
+        if h.get("t"):
+            b = baseline(prices, h["t"][0])
+            for k in _BASE:
+                _BASE[k].extend(b[k])
+        return find_setups(prices, h)
+    except Exception as e:
+        print("setups fail", sym, repr(e))
+        return []
+
+
 def build_company(u: dict, events_by_sym: dict) -> dict | None:
     sym, fin = u["symbol"], is_financial(u["industry"])
     prices = load_prices(sym)
@@ -385,6 +402,7 @@ def build_company(u: dict, events_by_sym: dict) -> dict | None:
                   "o": prices["open"].round(2).tolist(), "h": prices["high"].round(2).tolist(),
                   "l": prices["low"].round(2).tolist()},
         "levels": compute_levels_full(sym, prices),
+        "setups": _setups(sym, prices),
         "val": val, "dcf": dcf,
         "coffee_can": coffee_can(annual, fin),
         "buffett": buffett_checks(annual, fin, val["mcap"] if val else None, val["t"] if val else None),
@@ -594,6 +612,24 @@ def build_all(universe: list[dict]):
             "next_earnings": (c["estimates"].get("next_earnings") or [None])[0] if isinstance(c["estimates"].get("next_earnings"), list) else c["estimates"].get("next_earnings"),
         })
     write_json(SITE_DATA / "summary.json", summary)
+    # ----- setups: candle patterns at levels, across the universe, with a backtest
+    all_setups, recent = [], []
+    dates = sorted({s["date"] for c in companies.values() for s in c.get("setups", [])})
+    recent_from = dates[-10] if len(dates) >= 10 else (dates[0] if dates else "")
+    for sym, c in companies.items():
+        for st in c.get("setups", []):
+            all_setups.append(st)
+            if st["date"] >= recent_from:
+                recent.append({**st, "symbol": sym, "name": c["name"], "industry": c["industry"],
+                               "verdict": c["verdict"]["label"], "coffee_can": c["coffee_can"]["status"]})
+    recent.sort(key=lambda x: (x["date"], x["score"]), reverse=True)
+    base_hit = {k: (float(np.mean([x > 0 for x in v])) if v else None) for k, v in _BASE.items()}
+    write_json(SITE_DATA / "setups.json", {
+        "as_of": dates[-1] if dates else None, "recent_from": recent_from, "recent": recent,
+        "stats": summarize(all_setups, _BASE), "base_up_rate": base_hit, "total": len(all_setups),
+        "window_from": dates[0] if dates else None,
+        "patterns": {k: v[0] for k, v in PATTERNS.items()},
+    })
     write_json(SITE_DATA / "sectors.json", sectors)
     feed = []
     for sym, evs in events_by_sym.items():
