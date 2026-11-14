@@ -80,6 +80,14 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .z-res{background:color-mix(in srgb,var(--bad) 30%,transparent);border-color:var(--bad)}.z-res span{background:var(--bad)}
 .z-sup{background:color-mix(in srgb,var(--good) 30%,transparent);border-color:var(--good)}.z-sup span{background:var(--good)}
 .z-in{background:color-mix(in srgb,var(--warn) 32%,transparent);border-color:var(--warn)}.z-in span{background:var(--warn)}
+.zh{position:absolute;pointer-events:none}
+.zh.res{background:color-mix(in srgb,var(--bad) 16%,transparent);border-block:1px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+.zh.sup{background:color-mix(in srgb,var(--good) 16%,transparent);border-block:1px solid color-mix(in srgb,var(--good) 45%,transparent)}
+.zh.in{background:color-mix(in srgb,var(--warn) 18%,transparent);border-block:1px solid color-mix(in srgb,var(--warn) 50%,transparent)}
+.sw{position:absolute;height:0;border-top:2px solid;pointer-events:none}.sw.b{border-top-style:dashed;opacity:.7}
+.card.fs{position:fixed;inset:0;z-index:55;margin:0;border-radius:0;overflow:auto;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left))}
+.card.fs .chart{height:calc(100vh - 120px)!important;height:calc(100dvh - 120px)!important}
+body.fs-on{overflow:hidden}
 .lvtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
 .lvtab th,.lvtab td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}
 .lvtab td.n,.lvtab th.n{text-align:right;font-family:var(--f-mono)}
@@ -334,9 +342,9 @@ async function viewCompany(sym){
    </div>
    ${yrs<10?`<div class="banner">${yrs} years of fundamentals available${scr?` (${scr} from your Screener export)`:""}. The 10-year Coffee Can test and long valuation history need more years: export this company from Screener.in and drop the file in <span class="mono">data/screener_exports/</span>.</div>`:""}
    <div class="grid g2">
-    <div class="card"><div class="row between"><h3>Price · support &amp; resistance</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}</div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
+    <div class="card"><div class="row between"><h3>Price · support &amp; resistance</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}<button id="fsbtn" title="Full screen" aria-label="Full screen chart">⤢</button></div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
      <div class="row between" style="margin-top:8px"><div class="legend" id="lg-lv"></div>
-      <select id="lvset" aria-label="Support and resistance settings"><option value="daily">Levels: daily-tuned</option><option value="given">Levels: your settings</option><option value="off">Levels: off</option></select></div><div id="lv-list"></div></div>
+      <select id="lvset" aria-label="Support and resistance settings"><option value="daily">Levels: daily-tuned</option><option value="given">Levels: your settings</option><option value="off">Levels: off</option></select><label class="row" style="gap:4px"><input type="checkbox" id="lvhist" checked> history</label></div><div id="lv-list"></div></div>
     <div class="card"><h3>Why it looks ${esc((vd.label||"").replace("Looks ","").toLowerCase()||"this way")}</h3>
      ${vd.signals?`<p class="note" style="margin-top:0">Based on ${vd.signals} of 3 signals (reverse DCF, own history, peer-justified PE)${vd.signals<3?". Fewer signals means lower confidence":""}.</p>`:""}${(vd.parts||[]).length?`<div style="margin:0 0 12px">${vd.parts.map(p=>{const v=Math.max(-1,Math.min(1,p.s/2));return`<div style="margin:6px 0"><div class="row between"><span>${esc(p.name)} <span class="note">· ${(p.share*100).toFixed(0)}% weight</span></span><span class="note">${esc(p.detail)}</span></div><div class="bar" title="left = cheap, right = expensive"><i class="${v<0?"":"neg"}" style="left:${v<0?50+v*50:50}%;width:${Math.abs(v)*50}%"></i><i style="left:50%;width:1px;background:var(--muted)"></i></div></div>`}).join("")}<div class="row between note"><span>← cheap</span><span>expensive →</span></div></div>`:""}<ul class="reasons">${(vd.reasons||[]).map(r=>`<li>${esc(r)}</li>`).join("")||"<li class='muted'>No strong signal either way.</li>"}</ul>
      ${d.fair_value?`<div style="margin-top:var(--s4)"><h3 style="margin-bottom:8px">DCF value per share (FCFE, Damodaran-style)</h3>
@@ -377,7 +385,7 @@ async function viewCompany(sym){
     pl.setData(d);
   }else{pl=pc.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2});pl.setData(ser(P.t,P.c))}
   // support / resistance from the LevelIndicator (computed nightly in the pipeline)
-  let plines=[];
+  let plines=[];const IDX={};{let k=0;for(let i=0;i<P.t.length;i++)if(P.c[i]!=null)IDX[P.t[i]]=k++}
   const zl=$("#zlayer"),LV=c.levels||{};
   const drawLevels=()=>{
     const set=$("#lvset").value;plines.forEach(x=>pl.removePriceLine(x));plines=[];zl.innerHTML="";
@@ -391,20 +399,36 @@ async function viewCompany(sym){
     const W=pc.priceScale("right").width(),used=[];
     zs.forEach(z=>{const y1=pl.priceToCoordinate(z.high),y2=pl.priceToCoordinate(z.low);if(y1==null||y2==null)return;
       const top=Math.min(y1,y2),h=Math.max(4,Math.abs(y2-y1));
-      const el=document.createElement("div");el.className="zone z-"+z.kind;el.style.top=top+"px";el.style.height=h+"px";el.style.right=W+"px";
+      const el=document.createElement("div");el.className="zone z-"+z.kind;el.style.top=top+"px";el.style.height=h+"px";el.style.right=W+"px";{const i0=IDX[z.firstPivotTime];const x0=i0==null?null:pc.timeScale().logicalToCoordinate(i0);if(x0!=null&&x0>0)el.style.left=x0+"px"}
       let lx=6,ly=Math.max(2,top+h/2-9);while(used.some(u=>Math.abs(u[1]-ly)<18&&u[0]===lx))lx+=40;used.push([lx,ly]);
       el.innerHTML=`<span style="top:${ly-top}px;left:${lx}px">${z.tag}</span>`;zl.appendChild(el)});
+    if($("#lvhist").checked&&L.history){
+      const ts=pc.timeScale(),bs=Math.max(1,(ts.logicalToCoordinate(1)??1)-(ts.logicalToCoordinate(0)??0)),Wd=$("#ch-price").clientWidth-W;
+      const X=t=>{const i=IDX[t];return i==null?null:ts.logicalToCoordinate(i)};const frag=document.createDocumentFragment();
+      (L.history.zones||[]).forEach(z=>{if(z.to===LV.as_of)return;const x1=X(z.from),x2=X(z.to);if(x1==null||x2==null||x2<-bs||x1>Wd)return;
+        const y1=pl.priceToCoordinate(z.hi),y2=pl.priceToCoordinate(z.lo);if(y1==null||y2==null)return;
+        const el=document.createElement("div");el.className="zh "+(z.side>0?"res":z.side<0?"sup":"in");const l=Math.max(0,x1-bs/2),r=Math.min(Wd,x2+bs/2);
+        el.style.cssText=`left:${l}px;width:${Math.max(2,r-l)}px;top:${Math.min(y1,y2)}px;height:${Math.max(2,Math.abs(y2-y1))}px`;frag.appendChild(el)});
+      (L.history.swings||[]).forEach(w=>{if(w.to===LV.as_of)return;const x1=X(w.from),x2=X(w.to);if(x1==null||x2==null||x2<-bs||x1>Wd)return;const y=pl.priceToCoordinate(w.p);if(y==null)return;
+        const el=document.createElement("div");el.className="sw"+(w.b?" b":"");const l=Math.max(0,x1-bs/2),r=Math.min(Wd,x2+bs/2);
+        el.style.cssText=`left:${l}px;width:${Math.max(2,r-l)}px;top:${y-1}px;border-color:var(${w.side>0?"--bad":"--good"})`;frag.appendChild(el)});
+      zl.insertBefore(frag,zl.firstChild)}
     const nz=zs.length,nw=(L.swings||[]).length;
     $("#lg-lv").innerHTML=nz||nw?`<span><i style="background:var(--bad)"></i>resistance</span><span><i style="background:var(--good)"></i>support</span><span>as of ${esc(LV.as_of||"")}</span>`
       :`<span>No zones or swing levels in play with ${set==="given"?"your settings (built for 5-minute candles)":"these settings"}.</span>`;
     const rows=[...zs.map(z=>({tag:z.tag,col:z.kind==="res"?"--bad":z.kind==="sup"?"--good":"--warn",what:(z.kind==="res"?"Resistance":z.kind==="sup"?"Support":"Price in zone"),lvl:`${nf(z.low,z.low<100?2:0)}–${nf(z.high,z.high<100?2:0)}`,d:dist(z.mid),info:`${z.touches} touches · score ${z.score} · last ${esc(z.lastPivotTime||"")}`})),
       ...(L.swings||[]).map(w=>({tag:w.side==="high"?"SH":"SL",col:w.side==="high"?"--bad":"--good",what:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":""),lvl:nf(w.price,w.price<100?2:0),d:dist(w.price),info:`${esc(w.pivotTime||"")} · held ${w.holdBars} days`}))].sort((a,b)=>(b.d??0)-(a.d??0));
-    $("#lv-list").innerHTML=rows.length?`<div class="tablewrap"><table class="lvtab"><thead><tr><th></th><th>Level</th><th class="n">₹</th><th class="n">vs close</th><th class="hs">Detail</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="tag" style="background:var(${r.col})">${r.tag}</span></td><td>${r.what}</td><td class="n">${r.lvl}</td><td class="n">${r.d==null?"–":(r.d>0?"+":"")+r.d.toFixed(1)+"%"}</td><td class="note hs">${r.info}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:6px 0 0">Zones are shown only when price is within ${set==="given"?"1":"3"} daily ATR of them. Close ₹${nf(last,last<100?2:0)}.</p>`:"";
+    $("#lv-list").innerHTML=rows.length?`<div class="tablewrap"><table class="lvtab"><thead><tr><th></th><th class="hs">Level</th><th class="n">₹</th><th class="n">vs close</th><th class="hs">Detail</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="tag" style="background:var(${r.col})">${r.tag}</span></td><td class="hs">${r.what}</td><td class="n">${r.lvl}</td><td class="n">${r.d==null?"–":(r.d>0?"+":"")+r.d.toFixed(1)+"%"}</td><td class="note hs">${r.info}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:6px 0 0">Bright bands and tags are today’s levels. Faint bands and lines show what the indicator drew on each earlier day, using only the candles up to that day. Zones appear only when price is within ${set==="given"?"1":"3"} daily ATR of them. Close ₹${nf(last,last<100?2:0)}.</p>`:"";
   };
   const redraw=()=>requestAnimationFrame(()=>requestAnimationFrame(drawLevels));
   pc.timeScale().subscribeVisibleLogicalRangeChange(redraw);
   try{new ResizeObserver(redraw).observe($("#ch-price"))}catch(e){}
-  $("#lvset").onchange=redraw;
+  $("#lvset").onchange=redraw;$("#lvhist").onchange=redraw;
+  const fsCard=$("#ch-price").closest(".card");
+  const fsSet=on=>{fsCard.classList.toggle("fs",on);document.body.classList.toggle("fs-on",on);$("#fsbtn").textContent=on?"✕":"⤢";$("#fsbtn").title=on?"Exit full screen":"Full screen";redraw()};
+  $("#fsbtn").onclick=async()=>{const on=!fsCard.classList.contains("fs");fsSet(on);
+    try{if(on&&fsCard.requestFullscreen){await fsCard.requestFullscreen();await screen.orientation?.lock?.("landscape")}else if(!on&&document.fullscreenElement){await document.exitFullscreen()}}catch(e){}};
+  document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&fsCard.classList.contains("fs")&&document.body.contains(fsCard))fsSet(false)});
   const t0=c.price.t[0]||"",yrsHist=c.price.t.length?(new Date(c.price.t[c.price.t.length-1])-new Date(t0))/3.156e10:0;
   $("#rng").querySelectorAll("button").forEach(b=>{const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[b.dataset.r];if(y&&y>yrsHist+0.5)b.hidden=true});
   const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];const y={"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];
@@ -412,7 +436,7 @@ async function viewCompany(sym){
     const d0=new Date(end);d0.setFullYear(d0.getFullYear()-y);let from=d0.toISOString().slice(0,10);if(from<t0)from=t0;
     pc.timeScale().setVisibleRange({from,to:end})};
   const r0=hasOHLC?(yrsHist>=1?"1Y":"Max"):(yrsHist>=5?"5Y":"Max");$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.r===r0));setR(r0);
-  $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
+  $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b||!b.dataset.r)return;$("#rng").querySelectorAll("button[data-r]").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
 
   // valuation chart
   const vc=mkChart($("#ch-val"),{fmt:p=>p.toFixed(1)});

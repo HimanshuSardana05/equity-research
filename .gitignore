@@ -2,3 +2,4 @@ app/data/
 dist/
 __pycache__/
 *.tmp
+data/cache/

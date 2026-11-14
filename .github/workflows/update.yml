@@ -33,6 +33,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Restore level-history cache
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: levels-${{ github.run_id }}
+          restore-keys: levels-
       - name: Pick mode
         id: mode
         run: |

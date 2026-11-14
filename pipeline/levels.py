@@ -57,3 +57,143 @@ def compute_levels(prices: pd.DataFrame) -> dict:
             out[key] = {"zones": [], "swings": [], "error": str(e)[:200]}
     out["as_of"] = prices.index[-1].strftime("%Y-%m-%d") if len(prices) else None
     return out
+
+
+def compute_levels_full(sym: str, prices: pd.DataFrame) -> dict:
+    out = compute_levels(prices)
+    try:
+        hist = history_for(sym, prices)
+        for key, _, _ in SETS:
+            out[key]["history"] = segments(hist.get(key, {}))
+    except Exception as e:
+        out["history_error"] = str(e)[:200]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Levels through time: run the indicator at every daily candle using only the
+# candles up to it (the class's own design), then compress into segments.
+# ---------------------------------------------------------------------------
+import hashlib
+import json
+import os
+from concurrent.futures import ProcessPoolExecutor
+
+from common import ROOT
+
+HIST_BARS = 500           # about two trading years of history
+CACHE = ROOT / "data" / "cache" / "levels"
+CACHE_VERSION = 2
+SETS = (("daily", DailyLevelIndicator, 600), ("given", LevelIndicator, 400))
+
+
+def _bar_levels(ind, c: pd.DataFrame) -> list:
+    """Compact levels at the last candle of c: [zones, swings]."""
+    try:
+        z = ind.zones(c)
+        s = ind.swingLevels(c)
+    except Exception:
+        return [[], []]
+    zones = [[round(float(r.low), 2), round(float(r.high), 2), int(r.touches), {"above": 1, "below": -1}.get(r.side, 0)]
+             for r in z.itertuples()]
+    swings = [[round(float(r.price), 2), 1 if r.side == "high" else -1, bool(r.broken)] for r in s.itertuples()]
+    return [zones, swings]
+
+
+def _fingerprint(c: pd.DataFrame) -> list:
+    return [c["time"].tolist(), [round(x, 2) for x in c["close"].tolist()]]
+
+
+def history_for(sym: str, prices: pd.DataFrame) -> dict:
+    """Per-bar levels for the last HIST_BARS candles, cached and extended incrementally."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = CACHE / f"{sym.replace('&', '_')}.json"
+    cache = {}
+    if path.exists():
+        try:
+            cache = json.loads(path.read_text())
+        except Exception:
+            cache = {}
+    out = {}
+    for key, cls, bars in SETS:
+        full = _candles(prices, bars + HIST_BARS)
+        n = len(full)
+        if n < 60:
+            out[key] = {"t": [], "lv": []}
+            continue
+        start = max(30, n - HIST_BARS)
+        times = full["time"].tolist()
+        closes = [round(x, 2) for x in full["close"].tolist()]
+        old = cache.get(key) if cache.get("v") == CACHE_VERSION else None
+        known = {}
+        if old:
+            # reuse bars whose history (dates and closes) is unchanged; a split re-adjustment changes closes
+            idx = {t: i for i, t in enumerate(old["t"])}
+            prev_close = dict(zip(old["t"], old["c"]))
+            stable = all(prev_close.get(t) is None or abs(prev_close[t] - c_) <= 0.01 * max(1, abs(c_))
+                         for t, c_ in zip(times, closes))
+            if stable:
+                known = {t: old["lv"][i] for t, i in idx.items()}
+        ind = cls()
+        lv = []
+        for k in range(start, n):
+            t = times[k]
+            if t in known:
+                lv.append(known[t])
+                continue
+            c = full.iloc[max(0, k + 1 - bars):k + 1].reset_index(drop=True)
+            lv.append(_bar_levels(ind, c))
+        out[key] = {"t": times[start:], "c": closes[start:], "lv": lv}
+    out["v"] = CACHE_VERSION
+    path.write_text(json.dumps(out, separators=(",", ":")))
+    return out
+
+
+def segments(hist: dict) -> dict:
+    """Compress per-bar levels into drawable segments: same level on consecutive bars = one segment."""
+    t, lv = hist.get("t", []), hist.get("lv", [])
+    zones, swings, open_z, open_s = [], [], {}, {}
+    for i, (zs, ss) in enumerate(lv):
+        seen_z, seen_s = set(), set()
+        for lo, hi, touches, side in zs:
+            k = (lo, hi, side)
+            seen_z.add(k)
+            if k in open_z and open_z[k]["e"] == i - 1:
+                open_z[k]["e"] = i
+                open_z[k]["n"] = max(open_z[k]["n"], touches)
+            else:
+                seg = {"lo": lo, "hi": hi, "side": side, "s": i, "e": i, "n": touches}
+                open_z[k] = seg
+                zones.append(seg)
+        for price, side, broken in ss:
+            k = (price, side, broken)
+            seen_s.add(k)
+            if k in open_s and open_s[k]["e"] == i - 1:
+                open_s[k]["e"] = i
+            else:
+                seg = {"p": price, "side": side, "b": broken, "s": i, "e": i}
+                open_s[k] = seg
+                swings.append(seg)
+    fmt = lambda segs: [{**{k: v for k, v in s.items() if k not in ("s", "e")}, "from": t[s["s"]], "to": t[s["e"]]} for s in segs]
+    return {"zones": fmt(zones), "swings": fmt(swings)}
+
+
+def _warm(sym: str):
+    from prices import load_prices
+    try:
+        history_for(sym, load_prices(sym))
+        return sym, None
+    except Exception as e:
+        return sym, str(e)[:200]
+
+
+def precompute(symbols: list[str], workers: int | None = None):
+    """Fill/extend the per-bar cache for every symbol in parallel (the slow part, run once a day)."""
+    workers = workers or max(1, (os.cpu_count() or 2))
+    errs = 0
+    with ProcessPoolExecutor(workers) as ex:
+        for sym, err in ex.map(_warm, symbols, chunksize=4):
+            if err:
+                errs += 1
+                print("levels fail", sym, err)
+    print(f"levels history ready for {len(symbols) - errs}/{len(symbols)}")

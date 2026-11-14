@@ -20,7 +20,7 @@ from common import CONFIG, FUND, SITE_DATA, is_financial, now_iso, read_json, wr
 from events import load_events
 from fundamentals import fiscal_years
 from prices import load_prices
-from levels import compute_levels
+from levels import compute_levels_full, precompute
 
 
 def _f(x):
@@ -384,7 +384,7 @@ def build_company(u: dict, events_by_sym: dict) -> dict | None:
         "price": {"t": [d.strftime("%Y-%m-%d") for d in prices.index], "c": prices["close"].round(2).tolist(),
                   "o": prices["open"].round(2).tolist(), "h": prices["high"].round(2).tolist(),
                   "l": prices["low"].round(2).tolist()},
-        "levels": compute_levels(prices),
+        "levels": compute_levels_full(sym, prices),
         "val": val, "dcf": dcf,
         "coffee_can": coffee_can(annual, fin),
         "buffett": buffett_checks(annual, fin, val["mcap"] if val else None, val["t"] if val else None),
@@ -507,6 +507,8 @@ def build_all(universe: list[dict]):
         for e in load_events(kind):
             e = {**e, "kind": kind}
             events_by_sym[e["symbol"]].append(e)
+
+    precompute([u["symbol"] for u in universe])  # levels at every candle, cached
 
     companies = {}
     for i, u in enumerate(universe):
