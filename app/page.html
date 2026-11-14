@@ -75,11 +75,16 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .chart tr:hover{background:none!important}
 .chart.sm{height:240px}
 .zlayer{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
-.zone{position:absolute;left:0;border-block:1px solid}
-.zone span{position:absolute;left:6px;top:-15px;font-size:10px;font-family:var(--f-mono);white-space:nowrap;color:var(--ink);opacity:.85}
-.z-res{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
-.z-sup{background:color-mix(in srgb,var(--good) 18%,transparent);border-color:color-mix(in srgb,var(--good) 55%,transparent)}
-.z-in{background:color-mix(in srgb,var(--warn) 20%,transparent);border-color:color-mix(in srgb,var(--warn) 60%,transparent)}
+.zone{position:absolute;left:0;border-block:2px solid}
+.zone span{position:absolute;left:6px;font-size:11px;font-weight:600;font-family:var(--f-mono);white-space:nowrap;color:#fff;padding:1px 6px;border-radius:4px}
+.z-res{background:color-mix(in srgb,var(--bad) 30%,transparent);border-color:var(--bad)}.z-res span{background:var(--bad)}
+.z-sup{background:color-mix(in srgb,var(--good) 30%,transparent);border-color:var(--good)}.z-sup span{background:var(--good)}
+.z-in{background:color-mix(in srgb,var(--warn) 32%,transparent);border-color:var(--warn)}.z-in span{background:var(--warn)}
+.lvtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.lvtab th,.lvtab td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}
+.lvtab td.n,.lvtab th.n{text-align:right;font-family:var(--f-mono)}
+.lvtab{table-layout:auto}@media(max-width:640px){.lvtab{font-size:12px}.lvtab th,.lvtab td{padding:5px 4px}}
+.lvtab .tag{display:inline-block;min-width:26px;text-align:center;color:#fff;border-radius:4px;padding:0 5px;font:600 11px/1.6 var(--f-mono)}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
 .pill .sh{display:none}
 .p-good{background:var(--good-bg);color:var(--good)}
@@ -329,9 +334,9 @@ async function viewCompany(sym){
    </div>
    ${yrs<10?`<div class="banner">${yrs} years of fundamentals available${scr?` (${scr} from your Screener export)`:""}. The 10-year Coffee Can test and long valuation history need more years: export this company from Screener.in and drop the file in <span class="mono">data/screener_exports/</span>.</div>`:""}
    <div class="grid g2">
-    <div class="card"><div class="row between"><h3>Price</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}</div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
+    <div class="card"><div class="row between"><h3>Price · support &amp; resistance</h3><div class="row" id="rng">${["1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}">${r}</button>`).join("")}</div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div></div>
      <div class="row between" style="margin-top:8px"><div class="legend" id="lg-lv"></div>
-      <select id="lvset" aria-label="Support and resistance settings"><option value="daily">Levels: daily-tuned</option><option value="given">Levels: your settings</option><option value="off">Levels: off</option></select></div></div>
+      <select id="lvset" aria-label="Support and resistance settings"><option value="daily">Levels: daily-tuned</option><option value="given">Levels: your settings</option><option value="off">Levels: off</option></select></div><div id="lv-list"></div></div>
     <div class="card"><h3>Why it looks ${esc((vd.label||"").replace("Looks ","").toLowerCase()||"this way")}</h3>
      ${vd.signals?`<p class="note" style="margin-top:0">Based on ${vd.signals} of 3 signals (reverse DCF, own history, peer-justified PE)${vd.signals<3?". Fewer signals means lower confidence":""}.</p>`:""}${(vd.parts||[]).length?`<div style="margin:0 0 12px">${vd.parts.map(p=>{const v=Math.max(-1,Math.min(1,p.s/2));return`<div style="margin:6px 0"><div class="row between"><span>${esc(p.name)} <span class="note">· ${(p.share*100).toFixed(0)}% weight</span></span><span class="note">${esc(p.detail)}</span></div><div class="bar" title="left = cheap, right = expensive"><i class="${v<0?"":"neg"}" style="left:${v<0?50+v*50:50}%;width:${Math.abs(v)*50}%"></i><i style="left:50%;width:1px;background:var(--muted)"></i></div></div>`}).join("")}<div class="row between note"><span>← cheap</span><span>expensive →</span></div></div>`:""}<ul class="reasons">${(vd.reasons||[]).map(r=>`<li>${esc(r)}</li>`).join("")||"<li class='muted'>No strong signal either way.</li>"}</ul>
      ${d.fair_value?`<div style="margin-top:var(--s4)"><h3 style="margin-bottom:8px">DCF value per share (FCFE, Damodaran-style)</h3>
@@ -378,15 +383,24 @@ async function viewCompany(sym){
     const set=$("#lvset").value;plines.forEach(x=>pl.removePriceLine(x));plines=[];zl.innerHTML="";
     if(set==="off"){$("#lg-lv").innerHTML="";return}
     const L=LV[set]||{zones:[],swings:[]};
-    (L.swings||[]).forEach(w=>plines.push(pl.createPriceLine({price:w.price,color:w.side==="high"?css("--bad"):css("--good"),lineWidth:1,lineStyle:w.broken?2:0,axisLabelVisible:true,title:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":"")})));
-    const W=pc.priceScale("right").width();
-    (L.zones||[]).forEach(z=>{const y1=pl.priceToCoordinate(z.high),y2=pl.priceToCoordinate(z.low);if(y1==null||y2==null)return;
-      const kind=z.side==="above"?"res":z.side==="below"?"sup":"in";
-      const el=document.createElement("div");el.className="zone z-"+kind;el.style.top=Math.min(y1,y2)+"px";el.style.height=Math.max(3,Math.abs(y2-y1))+"px";el.style.right=W+"px";
-      el.innerHTML=`<span>${kind==="res"?"Resistance":kind==="sup"?"Support":"Price inside zone"} · ${z.touches} touches · score ${z.score}</span>`;zl.appendChild(el)});
-    const nz=(L.zones||[]).length,ns=(L.swings||[]).length;
-    $("#lg-lv").innerHTML=nz||ns?`<span><i style="background:var(--bad)"></i>resistance</span><span><i style="background:var(--good)"></i>support</span><span>${nz} zone${nz===1?"":"s"}, ${ns} swing level${ns===1?"":"s"} as of ${esc(LV.as_of||"")}</span>`
-      :`<span>No zones or swing levels in play with ${set==="given"?"your settings (built for 5-minute candles)":"these settings"}.</span>`};
+    const last=P.c[P.c.length-1];const dist=p=>last?((p/last-1)*100):null;
+    const zs=(L.zones||[]).map(z=>({...z,kind:z.side==="above"?"res":z.side==="below"?"sup":"in"}));
+    let nr=0,ns=0;zs.slice().sort((a,b)=>Math.abs(a.mid-last)-Math.abs(b.mid-last)).forEach(z=>{z.tag=z.kind==="res"?"R"+(++nr):z.kind==="sup"?"S"+(++ns):"Z"});
+    (L.swings||[]).forEach(w=>plines.push(pl.createPriceLine({price:w.price,color:w.side==="high"?css("--bad"):css("--good"),lineWidth:2,lineStyle:w.broken?2:0,axisLabelVisible:true,title:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":"")})));
+    zs.forEach(z=>plines.push(pl.createPriceLine({price:z.mid,color:z.kind==="res"?css("--bad"):z.kind==="sup"?css("--good"):css("--warn"),lineWidth:1,lineStyle:3,axisLabelVisible:true,title:z.tag})));
+    const W=pc.priceScale("right").width(),used=[];
+    zs.forEach(z=>{const y1=pl.priceToCoordinate(z.high),y2=pl.priceToCoordinate(z.low);if(y1==null||y2==null)return;
+      const top=Math.min(y1,y2),h=Math.max(4,Math.abs(y2-y1));
+      const el=document.createElement("div");el.className="zone z-"+z.kind;el.style.top=top+"px";el.style.height=h+"px";el.style.right=W+"px";
+      let lx=6,ly=Math.max(2,top+h/2-9);while(used.some(u=>Math.abs(u[1]-ly)<18&&u[0]===lx))lx+=40;used.push([lx,ly]);
+      el.innerHTML=`<span style="top:${ly-top}px;left:${lx}px">${z.tag}</span>`;zl.appendChild(el)});
+    const nz=zs.length,nw=(L.swings||[]).length;
+    $("#lg-lv").innerHTML=nz||nw?`<span><i style="background:var(--bad)"></i>resistance</span><span><i style="background:var(--good)"></i>support</span><span>as of ${esc(LV.as_of||"")}</span>`
+      :`<span>No zones or swing levels in play with ${set==="given"?"your settings (built for 5-minute candles)":"these settings"}.</span>`;
+    const rows=[...zs.map(z=>({tag:z.tag,col:z.kind==="res"?"--bad":z.kind==="sup"?"--good":"--warn",what:(z.kind==="res"?"Resistance":z.kind==="sup"?"Support":"Price in zone"),lvl:`${nf(z.low,z.low<100?2:0)}–${nf(z.high,z.high<100?2:0)}`,d:dist(z.mid),info:`${z.touches} touches · score ${z.score} · last ${esc(z.lastPivotTime||"")}`})),
+      ...(L.swings||[]).map(w=>({tag:w.side==="high"?"SH":"SL",col:w.side==="high"?"--bad":"--good",what:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":""),lvl:nf(w.price,w.price<100?2:0),d:dist(w.price),info:`${esc(w.pivotTime||"")} · held ${w.holdBars} days`}))].sort((a,b)=>(b.d??0)-(a.d??0));
+    $("#lv-list").innerHTML=rows.length?`<div class="tablewrap"><table class="lvtab"><thead><tr><th></th><th>Level</th><th class="n">₹</th><th class="n">vs close</th><th class="hs">Detail</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="tag" style="background:var(${r.col})">${r.tag}</span></td><td>${r.what}</td><td class="n">${r.lvl}</td><td class="n">${r.d==null?"–":(r.d>0?"+":"")+r.d.toFixed(1)+"%"}</td><td class="note hs">${r.info}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:6px 0 0">Zones are shown only when price is within ${set==="given"?"1":"3"} daily ATR of them. Close ₹${nf(last,last<100?2:0)}.</p>`:"";
+  };
   const redraw=()=>requestAnimationFrame(()=>requestAnimationFrame(drawLevels));
   pc.timeScale().subscribeVisibleLogicalRangeChange(redraw);
   try{new ResizeObserver(redraw).observe($("#ch-price"))}catch(e){}
