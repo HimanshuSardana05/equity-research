@@ -97,7 +97,8 @@ h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
 .card.fs .rp{margin-top:0;padding:4px 6px}
 .fsx{display:none}
 .card.fs .fsx{display:inline-flex;align-items:center;gap:6px;flex:none;font-weight:700;font-size:15px;padding:8px 14px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink,#fff);min-height:40px}
-.card.fs>.banner{display:none}
+.card.fs>.backbtn{display:inline-flex;align-items:center;gap:4px;margin:0 0 var(--s3);padding:8px 14px;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer}
+.banner{display:none}
 body.fs-on{overflow:hidden}body.fs-on .ac-fab,body.fs-on .ac-panel{display:none!important}
 .rp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding:8px;border:1px solid var(--accent);border-radius:8px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .rp button{min-width:40px;font-size:15px}.rp .dt{font-family:var(--f-mono);font-size:13px;font-weight:600;margin-left:auto}
@@ -248,8 +249,28 @@ const ser=(t,v)=>{const o=[];for(let i=0;i<t.length;i++)if(v[i]!=null&&isFinite(
 
 /* ---------- routing ---------- */
 let current="screen";
+/* Back to the list you came from, with its filters and scroll position */
+S.vs={};S.backTo=null;S.backDepth=0;S.cur=null;
+function viewSave(h){if(!h||h.startsWith("company"))return;const vals={};
+  $("#view").querySelectorAll("input[id],select[id]").forEach(e=>{if(e.closest(".card.fs"))return;vals[e.id]=e.type==="checkbox"?e.checked:e.value});
+  S.vs[h]={y:window.scrollY,vals}}
+function viewRestore(h){const st=S.vs[h];if(!st||decodeURIComponent(location.hash.slice(1)||"setups")!==h)return;
+  Object.entries(st.vals).forEach(([id,v])=>{const e=document.getElementById(id);if(!e)return;
+    if(e.type==="checkbox"){if(e.checked!==v){e.checked=v;e.dispatchEvent(new Event("change",{bubbles:true}))}}
+    else if(e.value!==v){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}))}});
+  let n=0;const sc=()=>{window.scrollTo(0,st.y);if(Math.abs(window.scrollY-st.y)>4&&n++<20)setTimeout(sc,100)};requestAnimationFrame(sc)}
+function backBtn(){if(!S.backTo||$("#backbtn"))return;const t=S.backTo,a=document.querySelector(`#tabs a[data-v="${t.split("-")[0]}"]`);
+  const b=document.createElement("button");b.id="backbtn";b.className="backbtn";b.innerHTML="‹ Back to "+esc(a?a.textContent:"list");
+  b.onclick=()=>{if(S.backDepth===1&&history.length>1)history.back();else location.hash=t};$("#view").prepend(b)}
 function route(){
   const h=decodeURIComponent(location.hash.slice(1))||"setups";
+  const prev=S.cur;if(prev&&prev!==h)viewSave(prev);S.cur=h;
+  if(h.startsWith("company")){if(prev&&!prev.startsWith("company")){S.backTo=prev;S.backDepth=1}else if(prev!==h&&!S.navReplace)S.backDepth++}
+  else S.backTo=null;
+  S.navReplace=false;
+  const done=routeView(h);Promise.resolve(done).then(()=>{if(h.startsWith("company"))backBtn();else viewRestore(h)});
+}
+function routeView(h){
   document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on",h===a.dataset.v||h.startsWith(a.dataset.v+"-")));
   clearCharts();
   if(h.startsWith("company-"))return viewCompany(dec(h.slice(8)));
@@ -511,7 +532,7 @@ async function viewCompany(sym){
      let i=N.list[N.i]&&N.list[N.i].sym===sym?N.i:N.list.findIndex(x=>x.sym===sym);if(i<0||!navEl.isConnected)return;N.i=i;S.setupNav=N;const it=N.list[i];
      navEl.innerHTML=`<button data-d="-1" aria-label="Previous setup" title="Previous setup"${i===0?" disabled":""}>‹</button><span class="t"><b class="sym">${esc(sym)}</b> · ${i+1}/${N.list.length} · <span style="color:var(${it.dir>0?"--good":"--bad"})">${it.dir>0?"▲":"▼"} ${esc(PATSHORT[it.pattern]||"")}</span> · ${it.sc}</span><button data-d="1" aria-label="Next setup" title="Next setup"${i===N.list.length-1?" disabled":""}>›</button>`;navEl.hidden=false;
      navEl.onclick=e=>{const b=e.target.closest("button[data-d]");if(!b||b.disabled)return;const j=i+(+b.dataset.d),n=N.list[j];N.i=j;S.focusSetup={sym:n.sym,date:n.date};S.keepFs=fsOpen();
-       if(fsOpen())fsSet(false);goCompany(n.sym)}})()}
+       if(fsOpen())fsSet(false);S.navReplace=true;location.replace("#company-"+enc(n.sym))}})()}
   const t0=c.price.t[0]||"",yrsHist=c.price.t.length?(new Date(c.price.t[c.price.t.length-1])-new Date(t0))/3.156e10:0;
   $("#rng").querySelectorAll("button").forEach(b=>{const y={"3M":.25,"6M":.5,"1Y":1,"3Y":3,"5Y":5,"10Y":10}[b.dataset.r];if(y&&y>yrsHist+0.5)b.hidden=true});
   const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];if(r==="Auto"&&DATA.length>60){autoR();return}
