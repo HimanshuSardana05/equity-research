@@ -124,7 +124,7 @@ FEATURES = {
     "trend50": ("cat", "Price vs 50-day avg", lambda c, s: _with(c["dir"], -c["a50"]) if c["a50"] is not None else None),
     "slope50": ("cat", "50-day avg direction", lambda c, s: _with(c["dir"], c["s50"]) if c["s50"] else None),
     "trend200": ("cat", "Price vs 200-day avg", lambda c, s: _with(c["dir"], -c["a200"]) if c["a200"] is not None else None),
-    "room": ("num", "Room to next level (x risk)", lambda c, s: c["room"]),
+    "room": ("num", "Reward:risk to next level", lambda c, s: c["room"]),
     "breakout_dist": ("num", "Breakout distance (ATR)", lambda c, s: c["brk"] if c["kind"] else None),
     "touch": ("num", "Touch distance (ATR)", lambda c, s: c["tol"]),
     "volatility": ("num", "Daily range (ATR %)", lambda c, s: c["atr"] / 100),
@@ -508,9 +508,61 @@ def run():
         "features": {k: {"kind": v[0], "label": v[1]} for k, v in FEATURES.items()}, "stock_attr": attr,
     }
     OUT.write_text(json.dumps(out, separators=(",", ":"), default=float))
+    try:
+        export_explorer(cands, split, attr, stocks)
+    except Exception as e:
+        print("explorer export failed:", repr(e))
     print(f"research: {len(rows)} labelled trades, tree with {len(leaves)} leaves, test avg {out['overall']['test'].get('avg')}R, "
           f"picked {ev['picked'].get('n')} avg {ev['picked'].get('avg')}R, brier {ev['brier']:.4f} vs {ev['brier_base']:.4f}")
     return out
+
+
+# ------------------------------------------------------------------ factor explorer files (Research > Explorer)
+EXPLORE = CACHE / "explore"
+SIM_KEYS = ("atr", "phi", "plo", "zlo", "zhi", "tgt")
+
+
+def _num(v, d=3):
+    return None if v is None else round(float(v), d)
+
+
+def export_explorer(cands, split, attr, stocks):
+    """Every setup with all its factor values, so the browser can slice any combination of factors without tokens.
+    One file per stock (with price paths, so trade rules can be changed in the browser) and one pooled file
+    (factor values and the result under the standard rule)."""
+    import shutil
+    if EXPLORE.exists():
+        shutil.rmtree(EXPLORE)
+    EXPLORE.mkdir(parents=True)
+    feats = list(FEATURES)
+    cats = {f: sorted({str(c["x"][f]) for c in cands if c["x"][f] is not None}) for f in feats if FEATURES[f][0] == "cat"}
+    enc = lambda f, v: None if v is None else (cats[f].index(str(v)) if f in cats else _num(v))
+    by = {}
+    for c in cands:
+        by.setdefault(c["sym"], []).append(c)
+    index = []
+    for sym, cs in by.items():
+        cs.sort(key=lambda c: c["date"])
+        Rs = [simulate(c) for c in cs]
+        d = {"symbol": sym, "name": (stocks.get(sym) or {}).get("name"), "attr": attr.get(sym, {}),
+             "dates": [c["date"] for c in cs], "R": [_num(r) for r in Rs],
+             "x": {f: [enc(f, c["x"][f]) for c in cs] for f in feats},
+             "sim": {**{k: [c[k] for c in cs] for k in SIM_KEYS}, "dir": [c["dir"] for c in cs], "path": [c["path"] for c in cs]}}
+        (EXPLORE / f"{sym.replace('&', '_')}.json").write_text(json.dumps(d, separators=(",", ":")))
+        rr = [r for r in Rs if r is not None]
+        index.append({"symbol": sym, "name": d["name"], "sector": attr.get(sym, {}).get("sector"), "n": len(rr), "from": cs[0]["date"],
+                      "avg": _num(np.mean(rr)) if rr else None,
+                      "vol": _num(np.median([c["x"]["volatility"] for c in cs if c["x"]["volatility"] is not None]) if cs else None, 2)})
+    lab = [c for c in cands if c.get("R") is not None]
+    syms = sorted(by)
+    si = {s_: i for i, s_ in enumerate(syms)}
+    pooled = {"syms": syms, "dates": [c["date"] for c in lab], "s": [si[c["sym"]] for c in lab], "R": [_num(c["R"]) for c in lab],
+              "x": {f: [enc(f, c["x"][f]) for c in lab] for f in feats}}
+    (EXPLORE / "_all.json").write_text(json.dumps(pooled, separators=(",", ":")))
+    meta = {"split": split, "features": {f: {"kind": FEATURES[f][0], "label": FEATURES[f][1], **({"cats": cats[f]} if f in cats else {})} for f in feats},
+            "label_rule": LABEL_RULE, "stocks": sorted(index, key=lambda z: z["symbol"])}
+    (EXPLORE / "_meta.json").write_text(json.dumps(meta, separators=(",", ":")))
+    print(f"explorer: {len(by)} stock files, pooled {len(lab)} trades")
 
 
 # ------------------------------------------------------------------ daily: apply the weekly tree to recent setups

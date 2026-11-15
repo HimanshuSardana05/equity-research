@@ -13,7 +13,10 @@ shutil.copytree(SITE / "functions", dist / "functions")
 shutil.copy(SITE.parent / "config" / "setup_rules.json", dist / "data" / "setup_rules.json")
 _rs = SITE.parent / "data" / "cache" / "research.json"  # weekly research result, kept in the run cache
 if _rs.exists():
-    shutil.copy(_rs, dist / "data" / "research.json")  # Setups scoring defaults  # Cloudflare Pages password middleware
+    shutil.copy(_rs, dist / "data" / "research.json")
+_ex = SITE.parent / "data" / "cache" / "explore"  # factor explorer files (one per stock + pooled)
+if _ex.exists():
+    shutil.copytree(_ex, dist / "data" / "explore")  # Setups scoring defaults  # Cloudflare Pages password middleware
 body = (SITE / "page.html").read_text()
 (dist / "index.html").write_text(
     '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
