@@ -39,6 +39,7 @@ nav.tabs{display:flex;gap:2px;flex-wrap:wrap}
 nav.tabs a{padding:6px 12px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500}
 nav.tabs a:hover{background:var(--soft);color:var(--ink)}
 nav.tabs a.on{background:var(--accent);color:var(--accent-ink)}
+#selco{margin-left:auto;flex:none}#selco+.search{margin-left:8px}
 .search{margin-left:auto;position:relative;min-width:0;flex:0 1 280px}
 .search input{width:100%}
 input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
@@ -200,6 +201,7 @@ footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px 
     <a href="#news" data-v="news">Announcements</a>
     <a href="#method" data-v="method">Method</a>
   </nav>
+  <a id="selco" class="pill p-neutral" href="#company" hidden title="Selected company (kept across tabs)" style="text-decoration:none">Selected <b class="mono"></b></a>
   <div class="search"><input id="q" placeholder="Search company or symbol" autocomplete="off" aria-label="Search company"><div class="sugg" id="sugg" hidden></div></div>
 </div></header>
 
@@ -211,6 +213,11 @@ footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px 
 "use strict";
 const $=(s,el=document)=>el.querySelector(s);
 const S={summary:[],sectors:{},meta:{},universe:[],cache:{},charts:[]};
+/* one selected company for every tab (and the Zones page), kept on this device */
+try{S.lastCompany=localStorage.getItem("his.sym")||null}catch(e){}
+function selectCompany(sym){if(!sym)return;S.lastCompany=sym;try{localStorage.setItem("his.sym",sym)}catch(e){}
+  const r=(S.summary||[]).find(x=>x.symbol===sym);if(r&&r.industry)S.lastSector=r.industry;const el=document.getElementById("selco");
+  if(el){el.hidden=false;el.querySelector("b").textContent=sym;el.href="#company-"+encodeURIComponent(sym)}}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const PAL=["#2f6fe0","#d9822b","#14a37f","#c4458a","#7a5cd6","#8a9a2a","#d24c3f","#2a9bc4","#6b7d8f","#b07d2a"];
@@ -278,7 +285,7 @@ function routeView(h){
   if(h.startsWith("company-"))return viewCompany(dec(h.slice(8)));
   if(h==="company")return viewCompany(S.lastCompany||(S.summary.slice().sort((a,b)=>(b.mcap||0)-(a.mcap||0))[0]||{}).symbol);
   if(h.startsWith("sector-"))return viewSector(S.sectorKeys[+h.slice(7)]);
-  if(h==="sector")return viewSector(S.lastSector);
+  if(h==="sector"){if(!S.lastSector&&S.lastCompany){const r=S.summary.find(x=>x.symbol===S.lastCompany);if(r)S.lastSector=r.industry}return viewSector(S.lastSector)}
   if(h==="factors")return viewFactors();
   if(h==="setups")return viewSetups();
   if(h==="backtest")return viewBacktest();
@@ -365,7 +372,7 @@ function viewScreen(){
 /* ================= COMPANY ================= */
 async function viewCompany(sym){
   const v=$("#view");if(!sym){v.innerHTML='<div class="empty">Search for a company above.</div>';return}
-  S.lastCompany=sym;v.innerHTML='<div class="empty">Loading '+esc(sym)+'…</div>';
+  selectCompany(sym);v.innerHTML='<div class="empty">Loading '+esc(sym)+'…</div>';
   let c;try{c=await company(sym)}catch(e){v.innerHTML='<div class="empty">No data for '+esc(sym)+' yet.</div>';return}
   const m=c.metrics,sec=S.sectors[c.industry]||{},d=c.dcf||{},cc=c.coffee_can,vd=c.verdict||{};
   const q=c.financial?"ROE":"ROCE";
@@ -656,7 +663,7 @@ async function viewSector(ind){
     {k:fin?"npm":"opm",l:fin?"Net margin":"OPM",n:1,h:1,r:x=>pct(fin?x.npm:x.opm)},...(fin?[]:[{k:"de",l:"D/E",n:1,h:1,r:x=>sx(x.de,2)}]),{k:"ret_1y",l:"1y",n:1,h:1,r:x=>pct(x.ret_1y,0)},
     {k:"cc_years",l:"Coffee Can",h:1,r:x=>ccPill(x.coffee_can,x.cc_years)},{k:"score",l:"Valuation",r:x=>verdictPill(x.verdict)}],rows,{onRow:goCompany});
 
-  const top=sec.members.slice(0,7);
+  const top=sec.members.slice(0,7);if(S.lastCompany&&sec.members.includes(S.lastCompany)&&!top.includes(S.lastCompany))top.push(S.lastCompany);
   const peers=(await Promise.all(top.map(s=>company(s).catch(()=>null)))).filter(Boolean);
   if(S.lastSector!==ind)return;
   const ch=mkChart($("#ch-sec"),{fmt:p=>p.toFixed(1)});let ss=[];
@@ -718,6 +725,7 @@ function scatter(xk,yk,ind,logY){
   pts.forEach(p=>{p.X=px(p.x);p.Y=py(p.y);p.rad=3+Math.sqrt((p.r.mcap||0)/mmax)*14});
   pts.sort((a,b)=>b.rad-a.rad).forEach(p=>{g.beginPath();g.arc(p.X,p.Y,p.rad,0,7);g.globalAlpha=.55;g.fillStyle=col(p.r.verdict);g.fill();g.globalAlpha=1;
     if(p.r.coffee_can==="Pass"||p.r.coffee_can==="Pass so far"){g.lineWidth=2;g.strokeStyle=css("--accent");g.stroke()}});
+  const me=pts.find(p=>p.r.symbol===S.lastCompany);if(me){g.beginPath();g.arc(me.X,me.Y,me.rad+4,0,7);g.lineWidth=3;g.strokeStyle=css("--ink");g.stroke();g.fillStyle=css("--ink");g.font="600 12px IBM Plex Mono, monospace";g.textAlign="left";g.fillText(me.r.symbol,me.X+me.rad+6,me.Y+4)}
   if(ind||pts.length<60){g.fillStyle=css("--ink");g.textAlign="left";g.font="10px IBM Plex Mono, monospace";pts.forEach(p=>g.fillText(p.r.symbol,p.X+p.rad+2,p.Y+3))}
   // rank correlation
   const rk=a=>{const s=a.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]);const r=Array(a.length);s.forEach((v,i)=>r[v[1]]=i);return r};
@@ -752,91 +760,118 @@ function suScore(s,R){const w=R.weights,c=k=>Math.max(0,+w[k]||0),tot=c("level")
 function suPass(s,R,noScore){if(R.patterns[s.pattern]===false||R.kinds[s.kind]===false||R.level_types[s.lt||"zone"]===false)return false;
   if((R.direction==="bull"&&s.dir<0)||(R.direction==="bear"&&s.dir>0))return false;if((s.tol||0)>R.tolerance_atr+1e-9)return false;
   return noScore||suScore(s,R)>=R.min_score}
+/* Calls: setups backed by evidence from Research (model), Explorer (validated factor zones), Zones (how the stock
+   behaves between zones) and your live Backtest strategies. Settings saved on this device. */
+const CALL_KEY="his.calls";
+const CALL_DEF={days:3,need:2,use:{zone:true,model:true,behave:true,strategy:true},zone:{min_n:100,min_r:0.05},model:{min_exp:0.05,min_prob:0.55,oos:true},behave:{test:"deflecting",brk:"directional"},min_score:0};
+const callLoad=()=>{try{const o=JSON.parse(localStorage.getItem(CALL_KEY)||"{}");return {...CALL_DEF,...o,use:{...CALL_DEF.use,...(o.use||{})},zone:{...CALL_DEF.zone,...(o.zone||{})},model:{...CALL_DEF.model,...(o.model||{})},behave:{...CALL_DEF.behave,...(o.behave||{})}}}catch(e){return JSON.parse(JSON.stringify(CALL_DEF))}};
+const callSave=c=>{try{localStorage.setItem(CALL_KEY,JSON.stringify(c))}catch(e){}};
 async function viewSetups(){
-  const v=$("#view");v.innerHTML='<div class="empty">Loading setups…</div>';
+  const v=$("#view");v.innerHTML='<div class="empty">Loading calls…</div>';
   let D;try{D=await setupsData()}catch(e){v.innerHTML='<div class="empty">Setups appear after the next daily build.</div>';return}
+  const [L,ZA,LS]=await Promise.all([getJSON("data/research_live.json").catch(()=>null),getJSON("data/zones/_all.json").catch(()=>null),liveSignals().catch(()=>null)]);
   let R=await suRules();
   if((location.hash.slice(1)||"setups")!=="setups")return;
-  const P=D.patterns||PATNAME,dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
-  const A=D.all?D.all.rows.map(r=>{const o={};D.all.cols.forEach((c,i)=>o[c]=r[i]);o.pattern=D.all.patterns[o.p];o.kind=o.kind?"break":"test";o.lt=o.lt?"swing":"zone";o.trend=!!o.trend;o.dir=(D.pattern_dir||{})[o.pattern]??(/^(bull|pier|morn)/.test(o.pattern)?1:-1);return o}):null;
-  const W=[["level","Level strength","How many times price has respected the level (full marks at the level score below)"],["pattern","Pattern quality","How clean the candle pattern is"],["volume","Volume","Signal-day volume vs its 20-day average"],["trend","Trend fit","Reversals after a move into the level; breakouts with the 20-day trend"]];
-  const KIND={test:"Level tests (support held / rejected at resistance)",break:"Breakouts and breakdowns"};
-  v.innerHTML=`<div class="grid" style="gap:var(--s4)">
-   <div><h1>Setups: candle patterns at levels</h1><p class="muted" style="margin:4px 0 0">A pattern counts only when it forms at a level your LevelIndicator already showed the day before: bullish patterns holding support or breaking resistance, bearish ones rejected at resistance or breaking support. No lookahead. Your scoring rules below decide what shows, how it is scored and what the backtest measures.</p></div>
-   <div id="su-live"></div>
-   <details class="card" id="su-rules"><summary style="cursor:pointer;font-weight:600"><span>Your scoring rules</span> <span class="note" id="su-sum" style="font-weight:400"></span></summary>
-    <div class="grid" style="gap:14px;margin-top:12px">
-     <label class="row" style="gap:10px;flex-wrap:wrap"><b style="min-width:150px">Minimum score</b><input type="range" id="r-min" min="0" max="100" step="5" style="flex:1;min-width:160px"><b class="mono" id="r-minv" style="min-width:32px;text-align:right"></b></label>
-     <div><b>Score weights</b> <span class="note">relative, scaled so the total score is out of 100</span>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:6px">${W.map(([k,l,h])=>`<label title="${esc(h)}" style="display:flex;flex-direction:column;gap:2px"><span>${l} <b class="mono" id="r-w-${k}v"></b></span><input type="range" min="0" max="100" step="5" id="r-w-${k}"><span class="note">${esc(h)}</span></label>`).join("")}</div></div>
-     <div class="row" style="gap:16px;flex-wrap:wrap">
-      <label class="row" style="gap:6px">Touch tolerance <select id="r-tol">${[0.1,0.15,0.25,0.35,0.5].map(x=>`<option value="${x}">${x} ATR</option>`).join("")}</select></label>
-      <label class="row" style="gap:6px">Level score for full marks <select id="r-full">${[0.3,0.45,0.6,0.75,0.9].map(x=>`<option value="${x}">${x}</option>`).join("")}</select></label>
-      <label class="row" style="gap:6px">Volume for full marks <select id="r-vol">${[1.5,2,2.5,3].map(x=>`<option value="${x}">${x}x average</option>`).join("")}</select></label>
-      <label class="row" style="gap:6px">Direction <select id="r-dir"><option value="both">Bullish and bearish</option><option value="bull">Bullish only</option><option value="bear">Bearish only</option></select></label></div>
-     <div><b>Patterns</b><div class="row" style="flex-wrap:wrap;gap:4px 14px;margin-top:4px">${Object.keys(P).map(k=>`<label class="row" style="gap:4px"><input type="checkbox" data-rp="${k}">${esc(P[k])}</label>`).join("")}</div></div>
-     <div class="row" style="flex-wrap:wrap;gap:4px 14px"><b>Level interaction</b>${Object.entries(KIND).map(([k,l])=>`<label class="row" style="gap:4px"><input type="checkbox" data-rk="${k}">${l}</label>`).join("")}
-      <b style="margin-left:8px">Level types</b><label class="row" style="gap:4px"><input type="checkbox" data-rl="zone">Zones</label><label class="row" style="gap:4px"><input type="checkbox" data-rl="swing">Swing highs / lows</label></div>
-     <div class="row" style="gap:8px;flex-wrap:wrap"><button id="r-reset">Reset to defaults</button><button id="r-export">Download rules for alerts</button><span class="note" id="r-state"></span></div>
-     <p class="note" style="margin:0">Touch tolerance is how far (in daily ATR) a candle may stop short of the level and still count as testing it. Rules are saved on this device. Alerts will use the rules file in the project, so when you are happy with these, download them and replace <span class="mono">config/setup_rules.json</span> (or ask Claude to).</p>
-    </div></details>
-   <div class="row">
-    <select id="su-day" aria-label="Days"><option value="1">Latest day (${esc(dates[0]||"")})</option><option value="5" selected>Last 5 trading days</option><option value="10">Last 10 trading days</option></select>
-    <select id="su-sort" aria-label="Sort"><option value="score">Highest score first</option><option value="date">Newest first</option></select>
-    <label class="row" style="gap:4px"><input type="checkbox" id="su-below"> show those below my minimum score</label>
-    <span class="note" id="su-n"></span>
-   </div>
-   <div id="su-t"></div>
-   <div class="card"><h3>Backtest with your rules</h3>
-    <p class="note" style="margin-top:0">Every setup over the last two years across the Nifty 500 (${nf(D.total||0,0)} signals since ${esc(D.window_from||"")}), filtered by your patterns, level types and tolerance. Returns are measured in the pattern's direction from the signal day's close, so a positive number means the move went the expected way. "Base" is the same measure on every day, so a combination is only useful if it beats its base. Fewer than 30 signals is too few to trust.</p>
-    <div id="su-head"></div><div id="su-s"></div></div>
+  const C=callLoad(),P=D.patterns||PATNAME,dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
+  const ZM={};(ZA&&ZA.rows||[]).forEach(r=>ZM[r.sym]=r);
+  const LM={};(L&&L.predictions||[]).forEach(p=>LM[p.symbol+"|"+p.date+"|"+p.pattern]=p);const ZL=(L&&L.zones)||[];
+  const SM={};(LS||[]).forEach(x=>{(SM[x.c.sym+"|"+x.c.date+"|"+x.c.pattern]=SM[x.c.sym+"|"+x.c.date+"|"+x.c.pattern]||[]).push(x)});
+  const r2=x=>x==null||!isFinite(x)?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%",px=x=>x==null?"–":"₹"+nf(x,x<100?2:0);
+  const opt=(a,val)=>a.map(([x,l])=>`<option value="${esc(String(x))}"${String(x)===String(val)?" selected":""}>${esc(l)}</option>`).join("");
+  const W=[["level","Level strength"],["pattern","Pattern quality"],["volume","Volume"],["trend","Trend fit"]];
+  v.innerHTML=`<style>.calls{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+   .call{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+   .call.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+   .call h4{margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:16px}.call .sub{font-size:13px;color:var(--muted)}
+   .why{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:13px}.why li{display:grid;grid-template-columns:18px 1fr;gap:4px}
+   .why .y{color:var(--good);font-weight:700}.why .n{color:var(--muted)}.why b{font-weight:600}
+   .cset{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.cset fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}
+   .cset legend{font-weight:600;font-size:13px;padding:0 4px}.cset label{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;margin:4px 0}</style>
+  <div class="grid" style="gap:var(--s3)">
+   <div class="row between" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">Calls</h1><div class="row" style="gap:8px">
+     <select id="c-days" aria-label="Days">${opt([[1,"Latest day ("+(dates[0]||"")+")"],[3,"Last 3 days"],[5,"Last 5 days"]],C.days)}</select>
+     <select id="c-need" aria-label="Evidence needed">${opt([[1,"1+ reasons"],[2,"2+ reasons"],[3,"3+ reasons"],[4,"All 4 reasons"]],C.need)}</select></div></div>
+   <div id="c-pin"></div>
+   <div id="c-list"></div>
+   <details class="card" id="c-set"><summary style="cursor:pointer;font-weight:600">Call settings</summary>
+    <div class="cset" style="margin-top:10px">
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="zone"${C.use.zone?" checked":""}> Explorer: validated factor zone</label></legend>
+      <label>Fewest trades in the zone <select data-k="zone.min_n">${opt([50,100,200,500,1000].map(x=>[x,x]),C.zone.min_n)}</select></label>
+      <label>Average in both periods at least <select data-k="zone.min_r">${opt([0,0.05,0.1,0.15,0.2].map(x=>[x,"+"+x+"R"]),C.zone.min_r)}</select></label></fieldset>
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="model"${C.use.model?" checked":""}> Research: model odds</label></legend>
+      <label>Expected result at least <select data-k="model.min_exp">${opt([0,0.05,0.1,0.15,0.2].map(x=>[x,"+"+x+"R"]),C.model.min_exp)}</select></label>
+      <label>Win probability at least <select data-k="model.min_prob">${opt([0.5,0.55,0.6,0.65].map(x=>[x,Math.round(x*100)+"%"]),C.model.min_prob)}</select></label>
+      <label>Condition held out of sample <select data-k="model.oos">${opt([["true","Required"],["false","Not required"]],String(C.model.oos))}</select></label></fieldset>
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="behave"${C.use.behave?" checked":""}> Zones: how the stock moves</label></legend>
+      <label>Level tests (bounces) need <select data-k="behave.test">${opt([["deflecting","Deflecting stock"],["notdir","Not directional"],["any","Any"]],C.behave.test)}</select></label>
+      <label>Breakouts need <select data-k="behave.brk">${opt([["directional","Directional stock"],["notdefl","Not deflecting"],["any","Any"]],C.behave.brk)}</select></label></fieldset>
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="strategy"${C.use.strategy?" checked":""}> Backtest: your live strategies</label></legend>
+      <p class="note" style="margin:4px 0">${stList().filter(s=>s.live).map(s=>esc(s.name)).join(", ")||"None live yet. Save a strategy in Backtest and switch it live."}</p></fieldset>
+    </div>
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Setup scoring and filters</summary>
+     <div class="grid" style="gap:10px;margin-top:10px">
+      <label class="row" style="gap:10px;flex-wrap:wrap">Minimum score <input type="range" id="r-min" min="0" max="100" step="5" style="flex:1;min-width:140px"><b class="mono" id="r-minv"></b></label>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">${W.map(([k,l])=>`<label style="display:flex;flex-direction:column;gap:2px;font-size:13px"><span>${l} weight <b class="mono" id="r-w-${k}v"></b></span><input type="range" min="0" max="100" step="5" id="r-w-${k}"></label>`).join("")}</div>
+      <div class="row" style="gap:12px;flex-wrap:wrap;font-size:13px">
+       <label class="row" style="gap:6px">Touch tolerance <select id="r-tol">${[0.1,0.15,0.25,0.35,0.5].map(x=>`<option value="${x}">${x} ATR</option>`).join("")}</select></label>
+       <label class="row" style="gap:6px">Level full marks <select id="r-full">${[0.3,0.45,0.6,0.75,0.9].map(x=>`<option value="${x}">${x}</option>`).join("")}</select></label>
+       <label class="row" style="gap:6px">Volume full marks <select id="r-vol">${[1.5,2,2.5,3].map(x=>`<option value="${x}">${x}x</option>`).join("")}</select></label>
+       <label class="row" style="gap:6px">Direction <select id="r-dir"><option value="both">Both</option><option value="bull">Buys only</option><option value="bear">Sells only</option></select></label></div>
+      <div class="row" style="flex-wrap:wrap;gap:4px 12px;font-size:13px">${Object.keys(P).map(k=>`<label class="row" style="gap:4px"><input type="checkbox" data-rp="${k}">${esc(P[k])}</label>`).join("")}</div>
+      <div class="row" style="flex-wrap:wrap;gap:4px 12px;font-size:13px"><label class="row" style="gap:4px"><input type="checkbox" data-rk="test">Level tests</label><label class="row" style="gap:4px"><input type="checkbox" data-rk="break">Breakouts</label><label class="row" style="gap:4px"><input type="checkbox" data-rl="zone">Zones</label><label class="row" style="gap:4px"><input type="checkbox" data-rl="swing">Swing highs / lows</label></div>
+      <div class="row" style="gap:8px"><button id="r-reset">Reset scoring</button><button id="c-reset">Reset call settings</button></div></div></details>
+   </details>
+   <details class="card" id="c-other"><summary style="cursor:pointer;font-weight:600">Other setups <span class="note" id="c-on" style="font-weight:400"></span></summary><div id="c-ot" style="margin-top:8px"></div></details>
   </div>`;
-  const pill=r=>`<span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(P[r.pattern]||r.pattern)}</span>`;
-  const pc=x=>x==null?"–":(x>0?"+":"")+(x*100).toFixed(1)+"%",pct=x=>x==null?"–":(x*100).toFixed(0)+"%";
-  const bAvg=k=>(D.base_avg||{})[k],bUp=k=>(D.base_up_rate||{})[k];
-  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null,hit=a=>a.length?a.filter(x=>x>0).length/a.length:null;
-  // ---------- rules form
+  // ---------- evidence for one setup
+  const evid=r=>{const k=r.symbol+"|"+r.date+"|"+r.pattern,p=LM[k],z=ZM[r.symbol],y=z&&z.y1,E=[];
+    if(C.use.zone){const ms=p?(p.zones||[]).map(i=>ZL[i]).filter(q=>q&&q.n>=C.zone.min_n&&q.ta>=C.zone.min_r&&q.ea>=C.zone.min_r):[];
+      E.push({k:"zone",ok:ms.length>0,t:ms.length?`<b>Validated zone</b>: ${esc(ms[0].label)}. ${r2(ms[0].ta)}R before, ${r2(ms[0].ea)}R since, ${ms[0].n} trades, PF ${ms[0].pf??"–"}${ms.length>1?` <span class="note">(+${ms.length-1} more zones)</span>`:""}`:(p?"<b>Validated zone</b>: none matches":"<b>Validated zone</b>: no data yet")})}
+    if(C.use.model){const ok=p&&p.exp_r>=C.model.min_exp&&p.prob>=C.model.min_prob&&(!C.model.oos||["holds","weaker"].includes(p.verdict));
+      E.push({k:"model",ok:!!ok,t:p?`<b>Model</b>: p(win) ${pc(p.prob)}, expected ${r2(p.exp_r)}R (${p.n} similar trades; ${p.verdict==="holds"||p.verdict==="weaker"?"held up out of sample":"did not hold out of sample"})`:"<b>Model</b>: no prediction"})}
+    if(C.use.behave){const cls=y&&y.class,need=r.kind==="test"?C.behave.test:C.behave.brk;
+      const ok=!!cls&&(need==="any"||(need==="deflecting"&&cls==="deflecting")||(need==="directional"&&cls==="directional")||(need==="notdir"&&cls!=="directional"&&cls!=="thin")||(need==="notdefl"&&cls!=="deflecting"&&cls!=="thin"));
+      const nx=z&&z.now?(r.dir>0?z.now.above:z.now.below):null;
+      E.push({k:"behave",ok,t:y?`<b>Zones</b>: ${esc(r.symbol)} is ${esc(cls)} (last year ${y.z2z} zone-to-zone moves of ${y.z2z+y.failed} bounces, ${y.brk} breakouts${y.leg_zones?", "+y.leg_zones+" zones per run":""})${nx?`. Next zone ${px(nx[0])}–${px(nx[1])}`:""}`:"<b>Zones</b>: no zone data"})}
+    if(C.use.strategy){const s=SM[k]||[];E.push({k:"strategy",ok:s.length>0,t:s.length?`<b>Strategy</b>: ${s.map(x=>esc(x.s.name)+(x.st==="entered"?" (entered)":" (waiting for entry)")).join(", ")}`:"<b>Strategy</b>: no live strategy took it"})}
+    return E};
+  // ---------- scoring rules form (kept from before)
   const form=()=>{$("#r-min").value=R.min_score;$("#r-minv").textContent=R.min_score;W.forEach(([k])=>{$("#r-w-"+k).value=R.weights[k]??0;$("#r-w-"+k+"v").textContent=R.weights[k]??0});
     $("#r-tol").value=String(R.tolerance_atr);$("#r-full").value=String(R.level_full_at);$("#r-vol").value=String(R.volume.full);$("#r-dir").value=R.direction||"both";
     v.querySelectorAll("[data-rp]").forEach(x=>x.checked=R.patterns[x.dataset.rp]!==false);v.querySelectorAll("[data-rk]").forEach(x=>x.checked=R.kinds[x.dataset.rk]!==false);v.querySelectorAll("[data-rl]").forEach(x=>x.checked=R.level_types[x.dataset.rl]!==false)};
-  const summ=()=>{const w=R.weights,off=Object.keys(P).filter(k=>R.patterns[k]===false).length;
-    $("#su-sum").textContent=`· min ${R.min_score} · weights ${["level","pattern","volume","trend"].map(k=>w[k]??0).join("/")} · tolerance ${R.tolerance_atr} ATR${off?` · ${off} pattern${off>1?"s":""} off`:""}${R.direction!=="both"?" · "+R.direction+"ish only":""}`;
-    const mine=suMine();$("#r-state").textContent=mine?"Your rules, saved on this device.":"Using the project defaults."};
-  const read=()=>{const o={min_score:+$("#r-min").value,weights:{},tolerance_atr:+$("#r-tol").value,level_full_at:+$("#r-full").value,volume:{...R.volume,full:+$("#r-vol").value},direction:$("#r-dir").value,patterns:{},kinds:{},level_types:{}};
+  const readR=()=>{const o={min_score:+$("#r-min").value,weights:{},tolerance_atr:+$("#r-tol").value,level_full_at:+$("#r-full").value,volume:{...R.volume,full:+$("#r-vol").value},direction:$("#r-dir").value,patterns:{},kinds:{},level_types:{}};
     W.forEach(([k])=>o.weights[k]=+$("#r-w-"+k).value);v.querySelectorAll("[data-rp]").forEach(x=>o.patterns[x.dataset.rp]=x.checked);v.querySelectorAll("[data-rk]").forEach(x=>o.kinds[x.dataset.rk]=x.checked);v.querySelectorAll("[data-rl]").forEach(x=>o.level_types[x.dataset.rl]=x.checked);return o};
-  let tmr;const changed=()=>{const o=read();R=suMerge(R,o);$("#r-minv").textContent=o.min_score;W.forEach(([k])=>$("#r-w-"+k+"v").textContent=o.weights[k]);
-    try{localStorage.setItem(SU_KEY,JSON.stringify(o))}catch(e){}summ();clearTimeout(tmr);tmr=setTimeout(draw,60)};
-  $("#su-rules").addEventListener("input",e=>{if(e.target.matches("input,select"))changed()});
-  $("#r-reset").onclick=async()=>{try{localStorage.removeItem(SU_KEY)}catch(e){}R=await suRules();form();summ();draw()};
-  $("#r-export").onclick=async()=>{const b=await suBase(),{patterns,kinds,level_types,weights,volume,...rest}=read();
-    const out=suMerge(b,{...rest,weights,volume,patterns,kinds,level_types});const a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)+"\n"],{type:"application/json"}));a.download="setup_rules.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
-  // ---------- tables
-  const draw=()=>{
-    const nd=+$("#su-day").value,from=dates[Math.min(nd,dates.length)-1]||"",below=$("#su-below").checked;
-    // backtest with the rules
-    const ok=A?A.filter(s=>suPass(s,R,true)):[];const grp={};
-    ok.forEach(s=>{s._sc=suScore(s,R);(grp[s.pattern+"|"+s.kind]=grp[s.pattern+"|"+s.kind]||[]).push(s)});
-    const stat={};Object.entries(grp).forEach(([k,ss])=>{const d=ss[0].dir,f=hz=>ss.filter(s=>s["r"+hz]!=null).map(s=>d*s["r"+hz]),hi=ss.filter(s=>s._sc>=R.min_score&&s.r10!=null).map(s=>d*s.r10);
-      stat[k]={pattern:ss[0].pattern,kind:ss[0].kind,dir:d,n:ss.length,hit5:hit(f(5)),hit10:hit(f(10)),hit20:hit(f(20)),avg10:mean(f(10)),base10:bAvg("r10")==null?null:d*bAvg("r10"),hit10_hi:hit(hi),n10_hi:hi.length,avg10_hi:mean(hi)}});
-    const rows=D.recent.filter(r=>r.date>=from&&suPass(r,R,true)).map(r=>({...r,_sc:suScore(r,R)})).filter(r=>below||r._sc>=R.min_score).sort($("#su-sort").value==="date"?(a,b)=>a.date===b.date?b._sc-a._sc:a.date<b.date?1:-1:(a,b)=>b._sc-a._sc||(a.date<b.date?1:-1));
-    $("#su-n").textContent=`${rows.length} setup${rows.length===1?"":"s"}`;
-    $("#su-t").innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Company</th><th>Pattern</th><th class="hs">At level</th><th class="n">Score</th><th class="n hs">Volume</th><th class="n">Hit 10d</th></tr></thead><tbody>${rows.map(r=>{const st=stat[r.pattern+"|"+r.kind];return`<tr data-s="${esc(r.symbol)}" data-d="${esc(r.date)}" style="cursor:pointer${r._sc<R.min_score?";opacity:.55":""}"><td class="mono">${esc(r.date.slice(5))}</td><td>${nameCell(r)}</td><td>${pill(r)}<div class="note">${esc(r.level)}</div></td><td class="hs mono">${nf(r.lo,r.lo<100?2:0)}${r.hi!==r.lo?"–"+nf(r.hi,r.hi<100?2:0):""}</td><td class="n"><b>${r._sc}</b></td><td class="n hs">${r.vol==null?"–":r.vol.toFixed(1)+"x"}</td><td class="n" title="${st?st.n+" past signals":""}">${st?pct(st.hit10_hi??st.hit10):"–"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Hit 10d = how often past setups of the same pattern at the same kind of level, passing your rules, moved the expected way over 10 days.</p>`
-      :`<div class="empty">No setups pass your rules in this window. Lower the minimum score, widen the tolerance or pick more days.</div>`;
-    $("#su-t").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>{S.focusSetup={sym:tr.dataset.s,date:tr.dataset.d};
-      S.setupNav={list:rows.map(r=>({sym:r.symbol,date:r.date,sc:r._sc,pattern:r.pattern,dir:r.dir})),i:[...tr.parentNode.children].indexOf(tr)};goCompany(tr.dataset.s)});
-    if(!A){$("#su-s").innerHTML='<div class="empty">The backtest with your rules appears after the next daily build.</div>';$("#su-head").innerHTML="";return}
-    const pass=ok.filter(s=>s._sc>=R.min_score&&s.r10!=null),rel=pass.map(s=>s.dir*s.r10),bu=bUp("r10");
-    const bh=pass.length?mean(pass.map(s=>s.dir>0?bu:1-bu)):null;
-    $("#su-head").innerHTML=`<div class="row" style="gap:24px;flex-wrap:wrap;margin:4px 0 12px"><div><div class="note">Signals passing your rules</div><b style="font-size:20px">${nf(pass.length,0)}</b></div><div><div class="note">Hit rate, 10 days</div><b style="font-size:20px;color:${bh!=null&&hit(rel)>bh?"var(--good)":"inherit"}">${pct(hit(rel))}</b> <span class="note">vs ${pct(bh)} base</span></div><div><div class="note">Average move, 10 days</div><b style="font-size:20px">${pc(mean(rel))}</b></div></div>`;
-    const st=Object.values(stat).sort((a,b)=>((b.avg10??-1)-(b.base10??0))-((a.avg10??-1)-(a.base10??0)));
-    $("#su-s").innerHTML=st.length?`<div class="tablewrap"><table><thead><tr><th>Pattern</th><th>At level</th><th class="n">Signals</th><th class="n">Hit 5d</th><th class="n">Hit 10d</th><th class="n hs">Hit 20d</th><th class="n">Avg 10d</th><th class="n hs">Base 10d</th><th class="n">Hit 10d, score ${R.min_score}+</th></tr></thead><tbody>${st.map(r=>{const bhit=bu==null?0.5:(r.dir>0?bu:1-bu),good=r.avg10!=null&&r.base10!=null&&r.avg10>r.base10&&r.hit10>bhit;return`<tr${r.n<30?' style="opacity:.6"':""}><td>${pill(r)}</td><td>${r.kind==="test"?(r.dir>0?"Held support":"Rejected at resistance"):(r.dir>0?"Broke resistance":"Broke support")}</td><td class="n">${r.n}</td><td class="n">${pct(r.hit5)}</td><td class="n"><b style="color:${good?"var(--good)":"inherit"}">${pct(r.hit10)}</b></td><td class="n hs">${pct(r.hit20)}</td><td class="n">${pc(r.avg10)}</td><td class="n hs">${pc(r.base10)}</td><td class="n">${r.n10_hi?pct(r.hit10_hi)+` <span class="note">(${r.n10_hi})</span>`:"–"}</td></tr>`}).join("")}</tbody></table></div><p class="note">Green hit rate = beat both the base return and the base hit rate (${pct(bu)} of all 10-day periods rose). Faded rows have fewer than 30 signals. Past hit rates are a guide, not a forecast.</p>`:'<div class="empty">No past signals pass these rules.</div>';
-  };
-  liveSignals().then(L=>{if(!L||!$("#su-live"))return;const px=(c,bp)=>bp==null?"–":nf(c.ref*(1+bp/1e4),c.ref<100?2:0);
-    $("#su-live").innerHTML=`<div class="card" style="border-color:var(--accent)"><h3>Live signals from your strategies</h3>${L.length?`<div class="tablewrap"><table><thead><tr><th>Signal</th><th>Company</th><th>Setup day</th><th>Status</th><th class="n">Entry ₹</th><th class="n hs">Stop ₹</th><th class="n hs">Target ₹</th><th class="hs">Strategy</th></tr></thead><tbody>${L.map((x,i)=>`<tr data-i="${i}" style="cursor:pointer"><td><span class="pill ${x.c.dir>0?"p-good":"p-bad"}">${x.c.dir>0?"BUY":"SELL"}</span> <span class="note">${esc(PATSHORT[x.c.pattern])} · ${x.c._sc}</span></td><td><b class="mono">${esc(x.c.sym)}</b></td><td class="mono">${esc(x.c.date.slice(5))}</td><td>${x.st==="waiting"?(x.t.trig==null?"Enter at next open":`Waiting: enter on a move ${x.c.dir>0?"above":"below"} ₹${px(x.c,x.t.trig)}`):"Entered, trade open"}</td><td class="n">${x.st==="entered"?px(x.c,x.t.entry):"–"}</td><td class="n hs">${x.st==="entered"?px(x.c,x.t.stop):"–"}</td><td class="n hs">${x.st==="entered"?px(x.c,x.t.target):"–"}</td><td class="hs note">${esc(x.s.name)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="note">No signals today from your live strategies.</div>`}</div>`;
-    $("#su-live").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{const x=L[+tr.dataset.i];S.focusSetup={sym:x.c.sym,date:x.c.date};
-      S.setupNav={list:L.map(y=>({sym:y.c.sym,date:y.c.date,sc:y.c._sc,pattern:y.c.pattern,dir:y.c.dir})),i:+tr.dataset.i};goCompany(x.c.sym)})});
-  form();summ();$("#su-day").onchange=draw;$("#su-below").onchange=draw;$("#su-sort").onchange=draw;draw();
+  // ---------- draw
+  const card=(r,i,cls)=>{const E=r._E,n=E.filter(e=>e.ok).length;
+    return `<div class="call${cls||""}" data-i="${i}"><h4><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"BUY":"SELL"}</span><span class="mono">${esc(r.symbol)}</span><span class="note" style="font-weight:400">${esc(r.date.slice(5))}</span><span class="note" style="margin-left:auto;font-weight:400">${n}/${E.length} reasons</span></h4>
+     <div class="sub">${esc(P[r.pattern]||r.pattern)} ${r.kind==="test"?(r.dir>0?"holding support":"rejected at resistance"):(r.dir>0?"breaking resistance":"breaking support")} ${px(r.lo)}${r.hi!==r.lo?"–"+px(r.hi):""} · score ${r._sc}</div>
+     <ul class="why">${E.map(e=>`<li><span class="${e.ok?"y":"n"}">${e.ok?"✓":"·"}</span><span${e.ok?"":' class="note"'}>${e.t}</span></li>`).join("")}</ul></div>`};
+  let shown=[];
+  const draw=()=>{const from=dates[Math.min(C.days,dates.length)-1]||"";
+    const rows=D.recent.filter(r=>r.date>=from&&suPass(r,R,true)).map(r=>({...r,_sc:suScore(r,R)})).filter(r=>r._sc>=R.min_score);
+    rows.forEach(r=>{r._E=evid(r);r._n=r._E.filter(e=>e.ok).length});
+    const used=Object.values(C.use).filter(Boolean).length,need=Math.min(C.need,used||1);
+    const calls=rows.filter(r=>used&&r._n>=need).sort((a,b)=>b._n-a._n||b._sc-a._sc||(a.date<b.date?1:-1));
+    const rest=rows.filter(r=>!calls.includes(r)).sort((a,b)=>b._n-a._n||b._sc-a._sc);
+    shown=[...calls,...rest];const sel=S.lastCompany;
+    const pin=sel&&!calls.some(r=>r.symbol===sel)?rows.filter(r=>r.symbol===sel):[];
+    $("#c-pin").innerHTML=sel?(pin.length?`<div class="note" style="margin-bottom:4px">Selected: ${esc(sel)}</div><div class="calls">${pin.map(r=>card(r,shown.indexOf(r)," sel")).join("")}</div>`:(calls.some(r=>r.symbol===sel)?"":`<p class="note">Selected: <b>${esc(sel)}</b> has no setup in this window.</p>`)):"";
+    const cnt={};["zone","model","behave","strategy"].forEach(k=>cnt[k]=rows.filter(r=>r._E.some(e=>e.k===k&&e.ok)).length);
+    $("#c-list").innerHTML=calls.length?`<div class="calls">${calls.map(r=>card(r,shown.indexOf(r),r.symbol===sel?" sel":"")).join("")}</div>`
+      :`<div class="card"><p style="margin:0">No setup has ${need}+ reasons right now.</p><p class="note" style="margin:6px 0 0">Of ${rows.length} setups: ${cnt.zone} in a validated zone, ${cnt.model} with good model odds, ${cnt.behave} fit the stock's zone behaviour, ${cnt.strategy} taken by a live strategy. Lower "reasons" or loosen the call settings.</p></div>`;
+    $("#c-on").textContent=`· ${rest.length}`;
+    $("#c-ot").innerHTML=rest.length?`<div class="tablewrap"><table><thead><tr><th>Setup</th><th>Company</th><th class="hs">Day</th><th class="n">Score</th><th class="n">Reasons</th></tr></thead><tbody>${rest.map(r=>`<tr data-i="${shown.indexOf(r)}" style="cursor:pointer"><td><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(PATSHORT[r.pattern]||r.pattern)}</span></td><td><b class="mono">${esc(r.symbol)}</b></td><td class="hs mono">${esc(r.date.slice(5))}</td><td class="n">${r._sc}</td><td class="n">${r._n}/${r._E.length}</td></tr>`).join("")}</tbody></table></div>`:'<p class="note">None.</p>';
+    v.querySelectorAll("[data-i]").forEach(el=>el.onclick=()=>{const i=+el.dataset.i,r=shown[i];if(!r)return;S.focusSetup={sym:r.symbol,date:r.date};
+      S.setupNav={list:shown.map(y=>({sym:y.symbol,date:y.date,sc:y._sc,pattern:y.pattern,dir:y.dir})),i};goCompany(r.symbol)})};
+  $("#c-days").onchange=e=>{C.days=+e.target.value;callSave(C);draw()};
+  $("#c-need").onchange=e=>{C.need=+e.target.value;callSave(C);draw()};
+  v.querySelectorAll("[data-u]").forEach(x=>x.onchange=()=>{C.use[x.dataset.u]=x.checked;callSave(C);draw()});
+  v.querySelectorAll("[data-k]").forEach(x=>x.onchange=()=>{const [a,b]=x.dataset.k.split(".");C[a][b]=x.value==="true"?true:x.value==="false"?false:(isNaN(+x.value)?x.value:+x.value);callSave(C);draw()});
+  $("#c-reset").onclick=()=>{try{localStorage.removeItem(CALL_KEY)}catch(e){}viewSetups()};
+  let tmr;v.querySelector("#c-set details").addEventListener("input",e=>{if(!e.target.matches("input,select"))return;const o=readR();R=suMerge(R,o);$("#r-minv").textContent=o.min_score;W.forEach(([k])=>$("#r-w-"+k+"v").textContent=o.weights[k]);
+    try{localStorage.setItem(SU_KEY,JSON.stringify(o))}catch(e){}clearTimeout(tmr);tmr=setTimeout(draw,60)});
+  $("#r-reset").onclick=async()=>{try{localStorage.removeItem(SU_KEY)}catch(e){}R=await suRules();form();draw()};
+  form();draw();
 }
 /* ================= BACKTEST: setups turned into buy / sell trades ================= */
 // Defaults mirror DEFAULT_STRATEGY in pipeline/signals.py; btPass mirrors passes() there.
@@ -1046,7 +1081,7 @@ async function viewResearch(){
   $("#rs-f").onchange=single;single();
   const SA=R.stock_attr||{};
   const stocks=()=>{const q=$("#rs-q").value.trim().toUpperCase(),vf=$("#rs-v").value;
-    const rows=(R.stocks||[]).filter(s=>(!q||s.symbol.includes(q)||((SA[s.symbol]||{}).sector||"").toUpperCase().includes(q))&&(!vf||s.verdict===vf));
+    const rows=(R.stocks||[]).slice().sort((a,b)=>(b.symbol===S.lastCompany)-(a.symbol===S.lastCompany)).filter(s=>(!q||s.symbol.includes(q)||((SA[s.symbol]||{}).sector||"").toUpperCase().includes(q))&&(!vf||s.verdict===vf));
     const sec={};(R.stocks||[]).forEach(s=>{const k=(SA[s.symbol]||{}).sector||"Other";const o=sec[k]||(sec[k]={n:0,sum:0,trn:0,trs:0,ten:0,tes:0});o.n+=s.n;o.sum+=s.n*s.avg;if(s.train&&s.train.n){o.trn+=s.train.n;o.trs+=s.train.n*s.train.avg}if(s.test&&s.test.n){o.ten+=s.test.n;o.tes+=s.test.n*s.test.avg}});
     const SE=Object.entries(sec).map(([k,o])=>({k,n:o.n,avg:o.sum/o.n,tr:o.trn?o.trs/o.trn:null,te:o.ten?o.tes/o.ten:null,ten:o.ten})).sort((a,b)=>(b.te??-9)-(a.te??-9));
     $("#rs-sec").innerHTML=`<details><summary style="cursor:pointer;font-weight:600">Sectors (${SE.length})</summary><div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Sector</th><th class="n">Trades</th><th class="n">In sample</th><th class="n">Out of sample</th></tr></thead><tbody>${SE.map(s=>`<tr><td>${esc(s.k)}</td><td class="n">${s.n}</td><td class="n" style="${tone(s.tr)}">${r2(s.tr)}R</td><td class="n" style="${tone(s.te)}">${r2(s.te)}R <span class="note">n=${s.ten}</span></td></tr>`).join("")}</tbody></table></div></details>`;
@@ -1083,6 +1118,7 @@ async function viewExplore(){
   let M;try{M=await exFile("_meta")}catch(e){v.innerHTML='<div class="empty">The explorer appears after the next weekly research run.</div>';return}
   if(location.hash.slice(1)!=="explore")return;
   const st=exLoad(),F=M.features,FK=Object.keys(F),SL=M.stocks;st.k=st.k||2;st.metric=st.metric||"avg";if(st.minN<10)st.minN=st.scope==="all"?100:10;
+  if(S.lastCompany&&SL.some(s=>s.symbol===S.lastCompany))st.sym=S.lastCompany;
   if(!st.sym||!SL.some(s=>s.symbol===st.sym)){const c=SL.filter(s=>s.n>=80&&s.vol!=null).sort((a,b)=>b.vol-a.vol);st.sym=(c[0]||SL[0]||{}).symbol}
   const rule={...EX_RULE,...(st.rule||{})};
   const r2=x=>x==null||!isFinite(x)?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%";
@@ -1204,7 +1240,7 @@ async function viewExplore(){
   cv.addEventListener("mouseleave",()=>tip.hidden=true);
   cv.addEventListener("click",e=>{const {best}=hit(e);tip.hidden=true;sel=best?best.z:null;draw();if(best&&window.innerWidth<700)$("#ex-sel").scrollIntoView({behavior:"smooth",block:"start"})});
   $("#ex-scope").onchange=e=>{st.scope=e.target.value;if(st.scope==="all"&&st.minN<100)st.minN=100;if(st.scope==="stock"&&st.minN>30)st.minN=10;$("#ex-min").value=st.minN;save();loadTrades()};
-  $("#ex-sym").onchange=e=>{st.sym=e.target.value;save();loadTrades()};
+  $("#ex-sym").onchange=e=>{st.sym=e.target.value;selectCompany(st.sym);save();loadTrades()};
   $("#ex-k").onchange=e=>{st.k=+e.target.value;save();sel=null;compute()};
   $("#ex-min").onchange=e=>{st.minN=+e.target.value;save();sel=null;compute()};
   $("#ex-metric").onchange=e=>{st.metric=e.target.value;save();draw()};
@@ -1253,6 +1289,7 @@ function viewMethod(){
 (async function(){
   try{
     [S.summary,S.sectors,S.meta]=await Promise.all([getJSON("data/summary.json"),getJSON("data/sectors.json"),getJSON("data/meta.json")]);
+    if(S.lastCompany)selectCompany(S.lastCompany);
     S.sectorKeys=Object.keys(S.sectors).sort();
     $("#asof").textContent="prices to "+(S.meta.price_date||"?");
     setupSearch();route();

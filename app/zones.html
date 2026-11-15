@@ -172,7 +172,7 @@ function table(){
 }
 
 /* ---------- detail ---------- */
-async function select(sym,scroll){
+async function select(sym,scroll){try{localStorage.setItem("his.sym",sym)}catch(e){}
   S.sel=sym;history.replaceState(null,"","#"+encodeURIComponent(sym));scatter();table();
   const r=S.rows.find(x=>x.sym===sym);const det=$("#det");
   let D;try{D=await (await fetch(file(sym))).json()}catch(e){det.innerHTML='<div class="empty">No zone data for this stock.</div>';return}
@@ -272,6 +272,7 @@ function search(){
   $("#tb").onclick=e=>{const tr=e.target.closest("tr");if(tr)select(tr.dataset.s,true)};
   addEventListener("resize",()=>scatter());
   const h=decodeURIComponent(location.hash.slice(1));
-  select(S.rows.some(r=>r.sym===h)?h:(S.rows.some(r=>r.sym==="ITC")?"ITC":S.rows[0].sym),false);
+  let saved=null;try{saved=localStorage.getItem("his.sym")}catch(e){}
+  select(S.rows.some(r=>r.sym===h)?h:(saved&&S.rows.some(r=>r.sym===saved)?saved:(S.rows.some(r=>r.sym==="ITC")?"ITC":S.rows[0].sym)),false);
 })();
 </script>

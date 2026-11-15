@@ -506,6 +506,7 @@ def run():
         "eval": {k: v for k, v in ev.items() if k not in ("probs", "wins")}, "calibration": cal,
         "factor_value": fv, "single": single, "stocks": stock_tab,
         "features": {k: {"kind": v[0], "label": v[1]} for k, v in FEATURES.items()}, "stock_attr": attr,
+        "zones": factor_zones(rows, split),
     }
     OUT.write_text(json.dumps(out, separators=(",", ":"), default=float))
     try:
@@ -515,6 +516,95 @@ def run():
     print(f"research: {len(rows)} labelled trades, tree with {len(leaves)} leaves, test avg {out['overall']['test'].get('avg')}R, "
           f"picked {ev['picked'].get('n')} avg {ev['picked'].get('avg')}R, brier {ev['brier']:.4f} vs {ev['brier_base']:.4f}")
     return out
+
+
+# ------------------------------------------------------------------ validated 2-factor zones (back the Setups calls)
+ZONE_BINS = {"score": [40, 50, 60, 70], "room": [0.5, 1, 1.5, 2, 3], "volume": [0.75, 1, 1.5, 2],
+             "pattern_quality": [0.5, 0.7, 0.9], "touch": [0.1, 0.2], "breakout_dist": [0.25, 0.5, 1]}  # = EX_BINS in page.html
+
+
+def _edges(f, vals):
+    if f in ZONE_BINS:
+        return ZONE_BINS[f]
+    v = sorted(x for x in vals if x is not None)
+    if not v:
+        return []
+    return sorted({float(f"{v[int(i * len(v) / 4)]:.3g}") for i in range(1, 4)})
+
+
+def _fmt(x):
+    return f"{x:.3g}"
+
+
+def factor_zones(rows, split, min_n=50, min_test=25):
+    """Every pair of factors with their steps (as in the Explorer); keep the zones that were positive on the older
+    70% of dates and still positive on the newest 30%."""
+    feats = list(FEATURES)
+    n = len(rows)
+    R = np.array([r["R"] for r in rows])
+    tr = np.array([r["date"] < split for r in rows])
+    codes, defs = {}, {}
+    for f in feats:
+        vals = [r["x"][f] for r in rows]
+        if FEATURES[f][0] == "cat":
+            cats = sorted({str(x) for x in vals if x is not None})
+            if len(cats) < 2:
+                continue
+            ix = {c: i for i, c in enumerate(cats)}
+            codes[f] = np.array([ix[str(x)] if x is not None else -1 for x in vals])
+            defs[f] = [{"v": c, "label": c} for c in cats]
+        else:
+            e = _edges(f, vals)
+            if not e:
+                continue
+            codes[f] = np.array([-1 if x is None else int(np.searchsorted(e, x, side="right")) for x in vals])
+            lab = [f"< {_fmt(e[0])}"] + [f"{_fmt(e[i])} to {_fmt(e[i + 1])}" for i in range(len(e) - 1)] + [f"≥ {_fmt(e[-1])}"]
+            defs[f] = [{"lo": (e[i - 1] if i > 0 else None), "hi": (e[i] if i < len(e) else None), "label": lab[i]} for i in range(len(e) + 1)]
+    fs = list(codes)
+    out = []
+    for a in range(len(fs)):
+        for b in range(a + 1, len(fs)):
+            f, g = fs[a], fs[b]
+            cf, cg = codes[f], codes[g]
+            K = len(defs[g])
+            ok = (cf >= 0) & (cg >= 0)
+            key = np.where(ok, cf * K + cg, -1)
+            size = len(defs[f]) * K
+            def agg(mask):
+                k = key[mask & ok]
+                r = R[mask & ok]
+                return (np.bincount(k, minlength=size), np.bincount(k, weights=r, minlength=size),
+                        np.bincount(k, weights=np.where(r > 0, r, 0), minlength=size), np.bincount(k, weights=np.where(r > 0, 1, 0), minlength=size))
+            tn, ts, tp, tw = agg(tr)
+            en, es, ep, ew = agg(~tr)
+            for k in np.nonzero((tn + en >= min_n) & (tn > 0) & (en >= min_test))[0]:
+                ta, ea = ts[k] / tn[k], es[k] / en[k]
+                if ta <= 0 or ea <= 0:
+                    continue
+                N = tn[k] + en[k]
+                pos = tp[k] + ep[k]
+                neg = pos - (ts[k] + es[k])
+                i, j = divmod(int(k), K)
+                out.append({"f": [f, g], "c": [defs[f][i], defs[g][j]],
+                            "label": f"{FEATURES[f][1]}: {defs[f][i]['label']} · {FEATURES[g][1]}: {defs[g][j]['label']}",
+                            "n": int(N), "avg": round(float((ts[k] + es[k]) / N), 3), "win": round(float((tw[k] + ew[k]) / N), 3),
+                            "pf": round(float(pos / neg), 2) if neg > 0 else None,
+                            "tn": int(tn[k]), "ta": round(float(ta), 3), "en": int(en[k]), "ea": round(float(ea), 3)})
+    out.sort(key=lambda z: -min(z["ta"], z["ea"]) * math.sqrt(z["n"]))
+    return out
+
+
+def _in_zone(z, x):
+    for f, c in zip(z["f"], z["c"]):
+        v = x.get(f)
+        if v is None:
+            return False
+        if "v" in c:
+            if str(v) != c["v"]:
+                return False
+        elif (c["lo"] is not None and v < c["lo"]) or (c["hi"] is not None and v >= c["hi"]):
+            return False
+    return True
 
 
 # ------------------------------------------------------------------ factor explorer files (Research > Explorer)
@@ -588,13 +678,15 @@ def live_predictions(recent_rows: list[list], cols: list[str], syms: list[str], 
         a = cfg["alert"]
         ok = (leaf["exp_r"] >= a["min_exp_r"] and leaf["prob"] >= a["min_prob"]
               and (not a["require_oos_positive"] or leaf.get("verdict") in ("holds", "weaker")))
+        zs = [i for i, z in enumerate(R.get("zones", [])) if _in_zone(z, x)]
         out.append({"symbol": c["sym"], "date": c["date"], "pattern": c["pattern"], "dir": c["dir"], "score": c["score"],
+                    "kind": "break" if c["kind"] else "test", "zones": zs,
                     "leaf": leaf["path"], "prob": leaf["prob"], "prob_ci": leaf["prob_ci"], "exp_r": leaf["exp_r"],
                     "exp_ci": leaf["all"].get("avg_ci"), "n": leaf["all"].get("n"), "train": leaf["train"], "test": leaf["test"],
                     "verdict": leaf.get("verdict"), "alert": bool(ok),
                     "rules": leaf["rules"]})
     out.sort(key=lambda z: (z["date"], z["exp_r"]), reverse=True)
-    return {"run": R["run"], "predictions": out}
+    return {"run": R["run"], "predictions": out, "zones": R.get("zones", []), "split": R.get("split_date")}
 
 
 if __name__ == "__main__":
