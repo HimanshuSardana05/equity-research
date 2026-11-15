@@ -1078,161 +1078,140 @@ function exStats(rs){const n=rs.length;if(!n)return{n:0};let s=0,w=0,ss=0,pos=0,
   return {n,avg:m,win:p,ci:[m-z*se,m+z*se],wci:[c-h,c+h],pf:neg>0?pos/neg:null}}
 function exVerdict(tr,te,min=5){if(!tr.n||tr.avg<=0)return"negative";if(!te.n||te.n<min)return"thin";if(te.avg<=0)return"degrades";if(te.avg<0.5*tr.avg)return"weaker";return"holds"}
 async function viewExplore(){
-  const v=$("#view");v.innerHTML='<div class="empty">Loading the factor explorer…</div>';
-  let M;try{M=await exFile("_meta")}catch(e){v.innerHTML='<div class="empty">The factor explorer appears after the next weekly research run.</div>';return}
+  const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
+  let M;try{M=await exFile("_meta")}catch(e){v.innerHTML='<div class="empty">The explorer appears after the next weekly research run.</div>';return}
   if(location.hash.slice(1)!=="explore")return;
-  const st=exLoad(),F=M.features,FK=Object.keys(F),SL=M.stocks;
+  const st=exLoad(),F=M.features,FK=Object.keys(F),SL=M.stocks;st.k=st.k||2;st.metric=st.metric||"avg";if(st.minN<10)st.minN=st.scope==="all"?100:10;
   if(!st.sym||!SL.some(s=>s.symbol===st.sym)){const c=SL.filter(s=>s.n>=80&&s.vol!=null).sort((a,b)=>b.vol-a.vol);st.sym=(c[0]||SL[0]||{}).symbol}
-  st.vars=st.vars.filter(f=>F[f]);const rule={...EX_RULE,...(st.rule||{})};
+  const rule={...EX_RULE,...(st.rule||{})};
   const r2=x=>x==null||!isFinite(x)?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%";
-  const VER={holds:["p-good","Holds up"],weaker:["p-warn","Weaker"],degrades:["p-bad","Degrades"],thin:["p-neutral","Too few"],negative:["p-neutral","Negative"]};
+  const VER={holds:["p-good","Holds up"],weaker:["p-warn","Weaker"],degrades:["p-bad","Stopped working"],thin:["p-neutral","Too few to tell"],negative:["p-neutral","Never worked"]};
   const vp=k=>VER[k]?`<span class="pill ${VER[k][0]}">${VER[k][1]}</span>`:"";
-  const sel=(id,lab,opts,val)=>`<label class="btf"><span>${lab}</span><select id="${id}">${opts.map(([a,b])=>`<option value="${esc(String(a))}"${String(a)===String(val)?" selected":""}>${esc(b)}</option>`).join("")}</select></label>`;
-  v.innerHTML=`<style>.btf{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}.btf select,.btf input{font-size:14px}.btg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-   .exv{display:flex;flex-direction:column;gap:6px}.exv>div{display:grid;grid-template-columns:22px 1fr minmax(90px,140px) auto;gap:6px;align-items:center;background:var(--soft);border-radius:8px;padding:6px 8px}
-   .exv b{font-size:13px}@media (max-width:600px){.exv>div{grid-template-columns:22px 1fr auto}.exv>div>input,.exv>div>span.note:nth-child(3){grid-column:2/4;grid-row:2}}.exv button{padding:4px 8px;min-width:32px}.exv input{width:100%;font-size:13px}
-   #ex-tree svg text{pointer-events:none;font-size:11px;fill:var(--ink)}#ex-tree rect{cursor:pointer}#ex-tree rect.sel{stroke:var(--ink);stroke-width:2.5}
-   .exk{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}.exk i{display:inline-block;width:14px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px;border:1px solid var(--line)}
-   .exbc{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:13px}.exbc button{padding:3px 9px;font-size:12px}</style>
-  <div class="grid" style="gap:var(--s4)">
-   <div><h1>Factor explorer</h1><p class="muted" style="margin:4px 0 0">Every setup since ${esc((SL.find(s=>s.symbol===st.sym)||{}).from||"2016")} with all its factors. Pick the variables and their steps: each row of the chart splits the trades by one variable, the next row splits each piece again, and the bottom row is every combination, coloured by its average result. Everything is calculated in your browser.</p></div>
-   <div class="card"><h3>What to explore</h3><div class="btg">
-     ${sel("ex-scope","Trades from",[["stock","One stock"],["sector","Its whole sector"],["all","All stocks (standard trade rule)"]],st.scope)}
-     <label class="btf"><span>Stock</span><select id="ex-sym">${SL.map(s=>`<option value="${esc(s.symbol)}"${s.symbol===st.sym?" selected":""}>${esc(s.symbol)} · ${s.n} trades${s.vol!=null?" · range "+nf(s.vol,1)+"%":""}</option>`).join("")}</select></label>
-     ${sel("ex-min","Fewest trades to colour a segment",[3,5,10,20,30,50,100,150].map(x=>[x,x]),st.minN)}
-     ${sel("ex-thr","Green / red beyond",[0.05,0.1,0.2,0.3].map(x=>[x,"±"+x+"R"]),st.thr)}</div>
-    <h3 style="margin-top:14px">Variables, in order (each one is a row of the chart)</h3>
-    <div class="exv" id="ex-vars"></div>
-    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><select id="ex-add"><option value="">+ Add a variable…</option></select><span class="note">Steps: a list like <span class="mono">1, 1.5, 2</span>, <span class="mono">step:0.1</span>, or <span class="mono">auto:5</span> (five equal-sized bands).</span></div>
-    <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Trade rule <span class="note" style="font-weight:400" id="ex-rnote"></span></summary><div class="btg" style="margin-top:8px">
-     ${sel("r-entry_days","Enter on a break of the pattern within",[1,2,3,5].map(x=>[x,x+" day"+(x>1?"s":"")]),rule.entry_days)}
-     ${sel("r-stop_atr","Stop beyond pattern / level",[0,0.1,0.25,0.5,1].map(x=>[x,x+" ATR"]),rule.stop_atr)}
-     ${sel("r-partial_r","Book half at",[[0,"Off"],[1,"1R"],[1.5,"1.5R"],[2,"2R"]],rule.partial_r)}
-     ${sel("r-trail_atr","Trail the rest by",[[0,"No trailing"],[1,"1 ATR"],[1.5,"1.5 ATR"],[2,"2 ATR"],[3,"3 ATR"]],rule.trail_atr)}
-     ${sel("r-max_days","Exit after",[5,10,15].map(x=>[x,x+" days"]),rule.max_days)}
-     ${sel("r-use_target","Exit at the next level",[["false","No, stops only"],["true","Yes"]],String(rule.use_target))}</div>
-     <div class="row" style="gap:8px;margin-top:8px"><button id="ex-rreset">Standard rule</button><span class="note">Changing the rule recalculates every trade from its price path. The pooled all-stock view always uses the standard rule.</span></div></details>
-   </div>
-   <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><h3 style="margin:0">Combinations</h3><span class="note" id="ex-count"></span></div>
-    <div class="exbc" id="ex-bc" style="margin:8px 0"></div><div id="ex-tree"></div>
-    <div class="exk" style="margin-top:8px"><span><i style="background:var(--good)"></i>wins on average</span><span><i style="background:var(--panel)"></i>no edge</span><span><i style="background:var(--bad)"></i>loses on average</span><span><i style="background:repeating-linear-gradient(45deg,var(--soft),var(--soft) 3px,var(--line) 3px,var(--line) 5px)"></i>too few trades to judge</span><span>Width = number of trades. Tap a segment for details, tap again to zoom in.</span></div>
-    <div id="ex-det" style="margin-top:12px"></div></div>
-   <div class="card"><h3>Where the results sit</h3><div id="ex-dist"></div></div>
-   <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><h3 style="margin:0">Best zones found by scanning every combination</h3>
-     <div class="row" style="gap:8px"><label class="row" style="gap:6px;align-items:center"><input type="checkbox" id="ex-d3"${st.depth3?" checked":""}>3 factors</label><button id="ex-scan">Scan</button></div></div>
-    <div id="ex-scanout" style="margin-top:8px"><p class="note">Tries every pair of variables (or every three) with their steps, ranks the zones by their result on the older 70% of dates and shows how each did on the newest 30%. Zones that only worked in the old data show as "Degrades".</p></div></div>
-   <div class="card"><h3>Changing the level logic or adding a factor</h3><p class="note">The factors come from the weekly research run. To try a different level logic or a new factor, change it in the pipeline (or ask Claude), run the research step, and this page shows the new outcome with the same chart, so you can compare before and after. Standard rule: enter on a break within ${M.label_rule.entry_days} days, stop ${M.label_rule.stop_atr} ATR, half at ${M.label_rule.partial_r}R then stop to entry, trail ${M.label_rule.trail_atr} ATR, exit after ${M.label_rule.max_days} days. Results include dividends. 70:30 split date: ${esc(M.split)}.</p></div>
+  const opt=(a,val)=>a.map(([x,l])=>`<option value="${esc(String(x))}"${String(x)===String(val)?" selected":""}>${esc(l)}</option>`).join("");
+  v.innerHTML=`<style>.exbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.exbar select{font-size:14px;max-width:100%}
+   .exwrap{position:relative}#ex-map{width:100%;display:block;touch-action:manipulation;cursor:crosshair}
+   .extip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+   .exsel{background:var(--soft);border-radius:10px;padding:12px}.exsel .rules{font-size:15px;line-height:1.5}
+   .exnum{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}.exnum div{display:flex;flex-direction:column}.exnum b{font-family:var(--f-mono);font-size:18px}.exnum span{font-size:12px;color:var(--muted)}
+   .exsplit{display:grid;grid-template-columns:minmax(80px,auto) 1fr 64px;gap:4px 8px;align-items:center;font-size:13px;margin-top:8px}.exsplit .bar{height:14px;border-radius:3px}
+   .extop{display:flex;flex-direction:column;gap:4px}.extop button{display:flex;justify-content:space-between;gap:8px;text-align:left;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:13px}
+   .exv{display:flex;flex-direction:column;gap:6px}.exv>div{display:grid;grid-template-columns:1fr minmax(100px,160px);gap:8px;align-items:center}.exv input{font-size:13px;width:100%}</style>
+  <div class="grid" style="gap:var(--s3)">
+   <div class="exbar"><h1 style="margin:0 8px 0 0">Explorer</h1>
+    <select id="ex-scope" aria-label="Trades from">${opt([["stock","One stock"],["sector","Its sector"],["all","All stocks"]],st.scope)}</select>
+    <select id="ex-sym" aria-label="Stock"${st.scope==="all"?" hidden":""}>${SL.map(s=>`<option value="${esc(s.symbol)}"${s.symbol===st.sym?" selected":""}>${esc(s.symbol)}</option>`).join("")}</select>
+    <select id="ex-k" aria-label="Factors per zone">${opt([[1,"1 factor"],[2,"2 factors"],[3,"3 factors"]],st.k)}</select>
+    <select id="ex-min" aria-label="Fewest trades">${opt([5,10,20,30,50,100,200,500].map(x=>[x,x+"+ trades"]),st.minN)}</select>
+    <select id="ex-metric" aria-label="Measure">${opt([["avg","Average R"],["pf","Profit factor"]],st.metric)}</select></div>
+   <div class="card" style="padding:var(--s3)"><div class="exwrap"><canvas id="ex-map" height="420"></canvas><div class="extip" id="ex-tip" hidden></div></div>
+    <div class="note" id="ex-cap" style="margin-top:4px"></div></div>
+   <div id="ex-sel"></div>
+   <details class="card"><summary style="cursor:pointer;font-weight:600">Steps and trade rule</summary>
+    <div class="exv" id="ex-vars" style="margin-top:10px"></div>
+    <div class="btg" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
+     <label class="btf"><span>Enter within</span><select id="r-entry_days">${opt([1,2,3,5].map(x=>[x,x+" day"+(x>1?"s":"")]),rule.entry_days)}</select></label>
+     <label class="btf"><span>Stop beyond level</span><select id="r-stop_atr">${opt([0,0.1,0.25,0.5,1].map(x=>[x,x+" ATR"]),rule.stop_atr)}</select></label>
+     <label class="btf"><span>Book half at</span><select id="r-partial_r">${opt([[0,"Off"],[1,"1R"],[1.5,"1.5R"],[2,"2R"]],rule.partial_r)}</select></label>
+     <label class="btf"><span>Trail by</span><select id="r-trail_atr">${opt([[0,"Off"],[1,"1 ATR"],[1.5,"1.5 ATR"],[2,"2 ATR"],[3,"3 ATR"]],rule.trail_atr)}</select></label>
+     <label class="btf"><span>Exit after</span><select id="r-max_days">${opt([5,10,15].map(x=>[x,x+" days"]),rule.max_days)}</select></label>
+     <label class="btf"><span>Exit at next level</span><select id="r-use_target">${opt([["false","No"],["true","Yes"]],String(rule.use_target))}</select></label></div>
+    <p class="note" style="margin:8px 0 0">Steps: <span class="mono">1, 1.5, 2</span> · <span class="mono">step:0.1</span> · <span class="mono">auto:5</span>. A changed rule recalculates each trade (one stock or sector only).</p></details>
   </div>`;
-  let T=[],zoom=[],selPath=null,ruleStd=true;
+  let T=[],Z=[],sel=null,ruleStd=true,B={},view=null;
   const save=()=>{st.rule=ruleStd?null:rule;exSave(st)};
-  async function loadTrades(){
-    $("#ex-tree").innerHTML='<div class="note">Loading trades…</div>';$("#ex-sym").disabled=st.scope==="all";
-    const rows=[];const cat=(f,v)=>v==null?null:(F[f].kind==="cat"?(F[f].cats||[])[v]:v);
-    ruleStd=Object.keys(EX_RULE).every(k=>String(rule[k])===String(EX_RULE[k]));
-    $("#ex-rnote").textContent=ruleStd?"(standard)":"(changed: recalculated)";
-    if(st.scope==="all"){const A=await exFile("_all");
-      for(let i=0;i<A.R.length;i++){const x={};for(const f of FK)x[f]=cat(f,A.x[f][i]);rows.push({date:A.dates[i],sym:A.syms[A.s[i]],R:A.R[i],x})}}
-    else{const me=await exFile(st.sym.replace("&","_"));let syms=[st.sym];
-      if(st.scope==="sector"){const sec=(me.attr||{}).sector;syms=SL.filter(s=>s.sector===sec).map(s=>s.symbol);
-        $("#ex-tree").innerHTML='<div class="note">Loading the sector…</div>';
-        const files=await Promise.all(syms.map(s=>exFile(s.replace("&","_")).catch(()=>null)));
-        files.forEach(d=>{if(d&&(d.attr||{}).sector===sec)addStock(d)})}
-      else addStock(me);
-      function addStock(d){const P={...BT_DEF,entry:"break",entry_days:+rule.entry_days,stop_atr:+rule.stop_atr,min_rr:0,no_target:"allow",partial_r:+rule.partial_r,partial_frac:0.5,be_after_partial:true,trail_atr:+rule.trail_atr,max_days:+rule.max_days};
-        for(let i=0;i<d.dates.length;i++){let R=d.R[i];
-          if(!ruleStd){const c={dir:d.sim.dir[i],path:d.sim.path[i]};for(const k of ["atr","phi","plo","zlo","zhi","tgt"])c[k]=d.sim[k][i];if(!rule.use_target||rule.use_target==="false")c.tgt=null;
-            const t=btSim(c,P);R=t&&!t.pending&&!t.open?t.R:null}
-          if(R==null)continue;const x={};for(const f of FK)x[f]=cat(f,d.x[f][i]);rows.push({date:d.dates[i],sym:d.symbol,R,x})}}}
-    T=rows;zoom=[];selPath=null;draw()}
-  function binners(){const B={};for(const f of FK)B[f]=exBinner(f,M,T.map(t=>t.x[f]),st.bins[f]??EX_BINS[f]);return B}
-  function varsUI(){const B=binners();
-    $("#ex-vars").innerHTML=st.vars.map((f,i)=>`<div data-f="${f}"><span class="note">${i+1}</span><b>${esc(F[f].label)}<span class="note" style="font-weight:400"> · ${B[f].labels.length-1} steps</span></b>${F[f].kind==="num"?`<input data-b="${f}" value="${esc(st.bins[f]??EX_BINS[f]??"auto:4")}" aria-label="Steps for ${esc(F[f].label)}">`:'<span class="note">its values</span>'}<span class="row" style="gap:4px;flex-wrap:nowrap"><button data-u="${i}" aria-label="Move up"${i?"":" disabled"}>↑</button><button data-x="${i}" aria-label="Remove">✕</button></span></div>`).join("")||'<div class="note">Add at least one variable.</div>';
-    $("#ex-add").innerHTML='<option value="">+ Add a variable…</option>'+FK.filter(f=>!st.vars.includes(f)).map(f=>`<option value="${f}">${esc(F[f].label)}</option>`).join("");
-    $("#ex-vars").querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{const i=+b.dataset.u;[st.vars[i-1],st.vars[i]]=[st.vars[i],st.vars[i-1]];zoom=[];selPath=null;save();draw()});
-    $("#ex-vars").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{st.vars.splice(+b.dataset.x,1);zoom=[];selPath=null;save();draw()});
-    $("#ex-vars").querySelectorAll("[data-b]").forEach(inp=>inp.onchange=()=>{st.bins[inp.dataset.b]=inp.value;zoom=[];selPath=null;save();draw()})}
   const isTr=t=>t.date<M.split;
-  function build(B){const vars=st.vars.slice(0,7);
-    const node=(idx,depth,path,label,short)=>{const n={path,label,short:short||label,idx,depth,st:exStats(idx.map(i=>T[i].R)),kids:[]};
-      if(depth<vars.length){const f=vars[depth],b=B[f],g=new Map();for(const i of idx){const c=b.code(T[i].x[f]);if(!g.has(c))g.set(c,[]);g.get(c).push(i)}
-        [...g.keys()].sort((a,b_)=>a-b_).forEach(c=>n.kids.push(node(g.get(c),depth+1,[...path,c],`${F[f].label}: ${b.labels[c]}`,b.labels[c])))}
-      return n};
-    return node(T.map((_,i)=>i),0,[],"All trades")}
-  function find(root,path){let n=root;for(const c of path){n=n.kids.find(k=>k.path[k.path.length-1]===c);if(!n)return null}return n}
-  function colour(n){const s=n.st;if(!s.n||s.n<st.minN)return {fill:"url(#exhatch)",op:1};const a=s.avg,t=+st.thr;
-    if(a>t)return {fill:"var(--good)",op:Math.min(1,0.35+0.65*(a-t)/(0.5))};if(a<-t)return {fill:"var(--bad)",op:Math.min(1,0.35+0.65*(-a-t)/0.5)};return {fill:"var(--panel)",op:1}}
-  function draw(){varsUI();if(!T.length){$("#ex-tree").innerHTML='<div class="note">No trades for this choice.</div>';$("#ex-dist").innerHTML="";return}
-    const B=binners(),root=build(B),top=find(root,zoom)||root;if(top===root)zoom=[];
-    const leaves=[];const walk=n=>{if(!n.kids.length)leaves.push(n);else n.kids.forEach(walk)};walk(top);
-    const tot=st.vars.slice(0,7).reduce((a,f)=>a*(B[f].labels.length),1);
-    $("#ex-count").textContent=`${T.length.toLocaleString("en-IN")} trades · ${tot.toLocaleString("en-IN")} possible combinations · ${leaves.length.toLocaleString("en-IN")} with trades here · ${leaves.filter(l=>l.st.n>=st.minN).length} with ${st.minN}+ trades`;
-    // breadcrumb
-    const crumbs=[root];{let n=root;for(const c of zoom){n=n.kids.find(k=>k.path[k.path.length-1]===c);crumbs.push(n)}}
-    $("#ex-bc").innerHTML=crumbs.map((n,i)=>i===crumbs.length-1?`<b>${esc(n.label)}</b>`:`<button data-z="${i}">${esc(n.label)}</button> ›`).join(" ");
-    $("#ex-bc").querySelectorAll("[data-z]").forEach(b=>b.onclick=()=>{zoom=zoom.slice(0,+b.dataset.z);selPath=null;draw()});
-    // icicle
-    const W=Math.max(300,$("#ex-tree").clientWidth||600),levels=st.vars.length-top.depth+1,RH=window.innerWidth<700?34:40,H=levels*RH;let svg="";
-    const lay=(n,x,w,row)=>{const c=colour(n),key=n.path.join(".");const lbl=row===0?n.label:n.short;
-      svg+=`<rect data-p="${key}" x="${x+0.5}" y="${row*RH+0.5}" width="${Math.max(0,w-1)}" height="${RH-2}" rx="3" fill="${c.fill}" fill-opacity="${c.op}" stroke="var(--line)"${selPath===key?' class="sel"':""}><title>${esc(n.label)} · ${n.st.n} trades · avg ${r2(n.st.avg)}R</title></rect>`;
-      if(w>54){const t1=lbl.length*6.2>w-8?lbl.slice(0,Math.max(1,Math.floor((w-8)/6.2)-1))+"…":lbl;svg+=`<text x="${x+5}" y="${row*RH+14}">${esc(t1)}</text>`;
-        if(RH>=34&&w>70)svg+=`<text x="${x+5}" y="${row*RH+28}" style="fill:var(--muted)">${r2(n.st.avg)}R · ${n.st.n}</text>`}
-      let cx=x;for(const k of n.kids){const kw=w*k.st.n/n.st.n;lay(k,cx,kw,row+1);cx+=kw}};
-    lay(top,0,W,0);
-    $("#ex-tree").innerHTML=`<div class="note" style="margin-bottom:4px">Rows: ${[top.label,...st.vars.slice(top.depth).map(f=>F[f].label)].map((x,i)=>`<b>${i+1}</b> ${esc(x)}`).join(" › ")}</div><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Combinations chart"><defs><pattern id="exhatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--soft)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--line)" stroke-width="3"/></pattern></defs>${svg}</svg>`;
-    $("#ex-tree").querySelectorAll("rect[data-p]").forEach(r=>r.onclick=()=>{const key=r.dataset.p,path=key?key.split(".").map(Number):[];
-      if(selPath===key&&find(root,path)&&find(root,path).kids.length){zoom=path;selPath=null;draw();return}selPath=key;draw()});
-    detail(selPath==null?null:find(root,selPath?selPath.split(".").map(Number):[]));
-    dist(leaves)}
-  function detail(n){const el=$("#ex-det");if(!n){el.innerHTML='<p class="note">Tap a segment to see its combination and how it did before and after the split date.</p>';return}
-    const rs=n.idx.map(i=>T[i]),tr=exStats(rs.filter(isTr).map(t=>t.R)),te=exStats(rs.filter(t=>!isTr(t)).map(t=>t.R)),a=n.st,vd=exVerdict(tr,te);
-    const conds=[];{let p=[];for(let d=0;d<n.path.length;d++){p.push(n.path[d]);const f=st.vars[d];conds.push(`${F[f].label}: <b>${esc(binners()[f].labels[n.path[d]])}</b>`)}}
-    const sy={};rs.forEach(t=>sy[t.sym]=(sy[t.sym]||0)+1);const topS=Object.entries(sy).sort((x,y)=>y[1]-x[1]).slice(0,6);
-    el.innerHTML=`<div style="background:var(--soft);border-radius:8px;padding:10px 12px"><div style="font-size:14px">${conds.join(" · ")||"All trades"}</div>
-     <div class="kpis" style="margin-top:8px"><div class="kpi"><b>${a.n}</b><span>trades</span></div><div class="kpi"><b style="color:var(${a.avg>0?"--good":"--bad"})">${r2(a.avg)}R</b><span>average (95%: ${r2(a.ci&&a.ci[0])} to ${r2(a.ci&&a.ci[1])})</span></div><div class="kpi"><b>${pc(a.win)}</b><span>win rate (${pc(a.wci&&a.wci[0])} to ${pc(a.wci&&a.wci[1])})</span></div><div class="kpi"><b>${a.pf==null?"–":nf(a.pf,2)}</b><span>profit factor</span></div></div>
-     <p style="margin:8px 0 0;font-size:14px">Older 70%: <b>${r2(tr.avg)}R</b> <span class="note">n=${tr.n}, win ${pc(tr.win)}</span> · Newest 30%: <b>${r2(te.avg)}R</b> <span class="note">n=${te.n}, win ${pc(te.win)}</span> ${vp(vd)}</p>
-     ${st.scope!=="stock"?`<p class="note" style="margin:6px 0 0">Most trades from: ${topS.map(([s,k])=>esc(s)+" "+k).join(", ")}</p>`:""}
-     ${a.n<st.minN?`<p class="note" style="margin:6px 0 0">Too few trades to read anything into this.</p>`:""}${n.kids.length?`<button id="ex-zin" style="margin-top:8px">Zoom into this</button>`:""}</div>`;
-    const z=$("#ex-zin");if(z)z.onclick=()=>{zoom=n.path;selPath=null;draw()}}
-  function dist(leaves){const bins=[];for(let x=-1;x<1.0001;x+=0.1)bins.push({lo:+x.toFixed(1),n:0,cells:0});let few=0,fewC=0,good=0,tot=0;
-    for(const l of leaves){tot+=l.st.n;if(l.st.n<st.minN){few+=l.st.n;fewC++;continue}const i=Math.max(0,Math.min(bins.length-1,Math.floor((l.st.avg+1)/0.1+1e-9)));bins[i].n+=l.st.n;bins[i].cells++;if(l.st.avg>+st.thr)good+=l.st.n}
-    const mx=Math.max(1,...bins.map(b=>b.n),few),W=Math.max(300,$("#ex-dist").clientWidth||600),H=160,P0=16,bw=(W-40)/(bins.length+1.5);let s=`<g transform="translate(${P0},0)">`;
-    bins.forEach((b,i)=>{const h=(H-30)*b.n/mx,x=i*bw,mid=b.lo+0.05,c=mid>+st.thr?"var(--good)":mid<-st.thr?"var(--bad)":"var(--muted)";
-      s+=`<rect x="${x+1}" y="${H-20-h}" width="${bw-2}" height="${h}" fill="${c}" fill-opacity="${Math.min(1,0.35+Math.abs(mid))}"><title>${b.lo} to ${(b.lo+0.1).toFixed(1)}R: ${b.n} trades in ${b.cells} combinations</title></rect>`});
-    const fx=(bins.length+0.5)*bw,fh=(H-30)*few/mx;s+=`<rect x="${fx}" y="${H-20-fh}" width="${bw}" height="${fh}" fill="url(#exhatch2)"><title>${few} trades in ${fewC} combinations with too few trades</title></rect>`;
-    [-1,-0.5,0,0.5,1].forEach(t=>{const x=(t+1)/0.1*bw;s+=`<text x="${x}" y="${H-5}" text-anchor="middle" style="font-size:11px;fill:var(--muted)">${t>0?"+":""}${t}R</text>`});
-    s+=`<text x="${fx+bw/2}" y="${H-5}" text-anchor="middle" style="font-size:11px;fill:var(--muted)">few</text></g>`;
-    $("#ex-dist").innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribution of combination results"><defs><pattern id="exhatch2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--soft)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--line)" stroke-width="3"/></pattern></defs>${s}</svg>
-     <p class="note">Each bar counts the trades whose combination (bottom row of the chart above) averages that result. ${tot?Math.round(good/tot*100):0}% of trades sit in green combinations, ${tot?Math.round(few/tot*100):0}% in combinations with too few trades to judge.</p>`}
-  function scan(){const out=$("#ex-scanout");out.innerHTML='<p class="note">Scanning…</p>';
-    setTimeout(()=>{const B=binners(),fs=FK.filter(f=>(B[f].labels.length>2||F[f].kind==="cat")&&new Set(T.map(t=>B[f].code(t.x[f]))).size>1),n=T.length,codes={};
-      for(const f of fs){const a=new Uint8Array(n);for(let i=0;i<n;i++)a[i]=Math.min(255,B[f].code(T[i].x[f]));codes[f]=a}
-      const R=Float64Array.from(T.map(t=>t.R)),tr=Uint8Array.from(T.map(t=>isTr(t)?1:0)),res=[],k=st.depth3?3:2,minN=st.minN;
-      const combos=[];for(let a=0;a<fs.length;a++)for(let b=a+1;b<fs.length;b++){if(k===2)combos.push([fs[a],fs[b]]);else for(let c=b+1;c<fs.length;c++)combos.push([fs[a],fs[b],fs[c]])}
-      for(const cb of combos){const L=cb.map(f=>B[f].labels.length),cs=cb.map(f=>codes[f]),m=new Map();
-        for(let i=0;i<n;i++){let key=0,skip=false;for(let j=0;j<cb.length;j++){const c=cs[j][i];if(c===L[j]-1&&L[j]>1&&B[cb[j]].labels[c]==="n/a"){skip=true;break}key=key*L[j]+c}if(skip)continue;
-          let o=m.get(key);if(!o){o=[0,0,0,0,0,0];m.set(key,o)}if(tr[i]){o[0]++;o[1]+=R[i];if(R[i]>0)o[2]++}else{o[3]++;o[4]+=R[i];if(R[i]>0)o[5]++}}
-        for(const [key,o] of m){if(o[0]<minN)continue;const avg=o[1]/o[0];if(avg<=0)continue;let r=key;const parts=[];for(let j=cb.length-1;j>=0;j--){parts.unshift(r%L[j]);r=Math.floor(r/L[j])}
-          res.push({cb,parts,tn:o[0],ta:avg,tw:o[2]/o[0],en:o[3],ea:o[3]?o[4]/o[3]:null,ew:o[3]?o[5]/o[3]:null})}}
-      res.forEach(z=>z.v=exVerdict({n:z.tn,avg:z.ta},{n:z.en,avg:z.ea},Math.max(5,Math.round(minN/3))));
-      res.sort((a,b)=>b.ta*Math.sqrt(b.tn)-a.ta*Math.sqrt(a.tn));const held=res.filter(z=>z.v==="holds"||z.v==="weaker");
-      const row=(z,i)=>`<tr data-i="${i}" style="cursor:pointer"><td style="min-width:200px">${z.cb.map((f,j)=>`${esc(F[f].label)}: <b>${esc(B[f].labels[z.parts[j]])}</b>`).join("<br>")}</td><td class="n">${r2(z.ta)}R <span class="note">n=${z.tn} · ${pc(z.tw)}</span></td><td class="n">${z.en?r2(z.ea)+"R":"–"} <span class="note">n=${z.en}${z.en?" · "+pc(z.ew):""}</span></td><td>${vp(z.v)}</td></tr>`;
-      const tbl=(L,off)=>`<div class="tablewrap"><table><thead><tr><th>Zone</th><th class="n">Older 70%</th><th class="n">Newest 30%</th><th>Verdict</th></tr></thead><tbody>${L.map((z,i)=>row(z,off+i)).join("")}</tbody></table></div>`;
-      const shown=[...held.slice(0,15),...res.slice(0,15)];
-      out.innerHTML=`<p class="note">${combos.length.toLocaleString("en-IN")} variable ${k===2?"pairs":"triples"}, ${res.length.toLocaleString("en-IN")} zones positive in the older 70% with ${minN}+ trades, of which ${held.length} stayed positive on the newest 30%. With this many tries some zones look good by luck, so prefer ones with many trades that hold up.</p>
-       <h4 style="margin:10px 0 6px">Held up out of sample${st.scope==="stock"?" for "+esc(st.sym):""}</h4>${held.length?tbl(held.slice(0,15),0):'<p class="note">None. Nothing in this data kept working after the split date.</p>'}
-       <h4 style="margin:12px 0 6px">Best in the older 70% (before checking)</h4>${tbl(res.slice(0,15),15)}<p class="note">Tap a zone to put its variables first in the chart and select it.</p>`;
-      out.querySelectorAll("tr[data-i]").forEach(t=>t.onclick=()=>{const z=shown[+t.dataset.i];if(!z)return;st.vars=[...z.cb,...st.vars.filter(f=>!z.cb.includes(f))].slice(0,Math.max(z.cb.length,Math.min(st.vars.length,5)));
-        save();zoom=z.parts.slice(0,-1);selPath=z.parts.join(".");draw();$("#ex-tree").scrollIntoView({behavior:"smooth",block:"center"})})},30)}
-  $("#ex-scope").onchange=e=>{st.scope=e.target.value;save();loadTrades()};
+  async function loadTrades(){
+    $("#ex-cap").textContent="Loading trades…";$("#ex-sym").hidden=st.scope==="all";
+    const rows=[],cat=(f,x)=>x==null?null:(F[f].kind==="cat"?(F[f].cats||[])[x]:x);
+    ruleStd=Object.keys(EX_RULE).every(k=>String(rule[k])===String(EX_RULE[k]));
+    const add=d=>{const P={...BT_DEF,entry:"break",entry_days:+rule.entry_days,stop_atr:+rule.stop_atr,min_rr:0,no_target:"allow",partial_r:+rule.partial_r,partial_frac:0.5,be_after_partial:true,trail_atr:+rule.trail_atr,max_days:+rule.max_days};
+      for(let i=0;i<d.dates.length;i++){let R=d.R[i];
+        if(!ruleStd){const c={dir:d.sim.dir[i],path:d.sim.path[i]};for(const k of ["atr","phi","plo","zlo","zhi","tgt"])c[k]=d.sim[k][i];if(!rule.use_target||rule.use_target==="false")c.tgt=null;const t=btSim(c,P);R=t&&!t.pending&&!t.open?t.R:null}
+        if(R==null)continue;const x={};for(const f of FK)x[f]=cat(f,d.x[f][i]);rows.push({date:d.dates[i],sym:d.symbol,R,x})}};
+    if(st.scope==="all"){const A=await exFile("_all");for(let i=0;i<A.R.length;i++){const x={};for(const f of FK)x[f]=cat(f,A.x[f][i]);rows.push({date:A.dates[i],sym:A.syms[A.s[i]],R:A.R[i],x})}}
+    else{const me=await exFile(st.sym.replace("&","_"));if(st.scope==="sector"){const sec=(SL.find(s=>s.symbol===st.sym)||{}).sector;
+        const fs=await Promise.all(SL.filter(s=>s.sector===sec).map(s=>exFile(s.symbol.replace("&","_")).catch(()=>null)));fs.forEach(d=>d&&add(d))}else add(me)}
+    T=rows;sel=null;compute()}
+  function compute(){
+    B={};for(const f of FK)B[f]=exBinner(f,M,T.map(t=>t.x[f]),st.bins[f]??EX_BINS[f]);
+    const fs=FK.filter(f=>new Set(T.map(t=>B[f].code(t.x[f]))).size>1),n=T.length,codes={},k=+st.k;
+    for(const f of fs){const a=new Uint8Array(n);for(let i=0;i<n;i++)a[i]=Math.min(255,B[f].code(T[i].x[f]));codes[f]=a}
+    const R=Float64Array.from(T.map(t=>t.R)),tr=Uint8Array.from(T.map(t=>isTr(t)?1:0)),combos=[];
+    for(let a=0;a<fs.length;a++){if(k===1){combos.push([fs[a]]);continue}for(let b=a+1;b<fs.length;b++){if(k===2)combos.push([fs[a],fs[b]]);else for(let c=b+1;c<fs.length;c++)combos.push([fs[a],fs[b],fs[c]])}}
+    Z=[];for(const cb of combos){const L=cb.map(f=>B[f].labels.length),cs=cb.map(f=>codes[f]),m=new Map();
+      for(let i=0;i<n;i++){let key=0,skip=false;for(let j=0;j<cb.length;j++){const c=cs[j][i];if(c===L[j]-1){skip=true;break}key=key*L[j]+c}if(skip)continue;
+        let o=m.get(key);if(!o){o=[0,0,0,0,0,0,0,0];m.set(key,o)}const r=R[i];if(tr[i]){o[0]++;o[1]+=r;if(r>0)o[2]+=r;else o[3]-=r}else{o[4]++;o[5]+=r;if(r>0)o[6]+=r;else o[7]-=r}}
+      for(const [key,o] of m){if(o[0]+o[4]<st.minN)continue;let r=key;const parts=[];for(let j=cb.length-1;j>=0;j--){parts.unshift(r%L[j]);r=Math.floor(r/L[j])}
+        const pf=(p,q)=>q>0?p/q:(p>0?9:null);
+        Z.push({cb,parts,tn:o[0],ta:o[0]?o[1]/o[0]:null,tp:pf(o[2],o[3]),en:o[4],ea:o[4]?o[5]/o[4]:null,ep:pf(o[6],o[7]),n:o[0]+o[4],avg:(o[1]+o[5])/(o[0]+o[4]),pf:pf(o[2]+o[6],o[3]+o[7])})}}
+    Z.forEach(z=>z.v=exVerdict({n:z.tn,avg:z.ta},{n:z.en,avg:z.ea},Math.max(5,Math.round(st.minN/4))));
+    draw()}
+  const zname=z=>z.cb.map((f,j)=>`${F[f].label} ${B[f].labels[z.parts[j]]}`).join(" · ");
+  function draw(panel=true){const cv=$("#ex-map");if(!cv)return;const W=cv.parentElement.clientWidth,H=Math.min(460,Math.max(300,Math.round(W*0.62))),dpr=window.devicePixelRatio||1;
+    cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);
+    const css=getComputedStyle(document.documentElement),C=k=>css.getPropertyValue(k).trim();
+    const pfm=st.metric==="pf";let lim;
+    if(pfm)lim=[0.25,4];else{const vals=[];Z.forEach(z=>{if(z.en>0){vals.push(Math.abs(z.ta),Math.abs(z.ea))}});vals.sort((a,b)=>a-b);const q=vals.length?vals[Math.floor(vals.length*0.98)]:0.5;const m=Math.max(0.25,Math.ceil(q*4)/4);lim=[-m,m]}
+    const tx=x=>pfm?Math.log(Math.max(lim[0],Math.min(lim[1],x||lim[0]))):Math.max(lim[0],Math.min(lim[1],x));
+    const L0=58,R0=10,T0=12,B0=34,X=x=>L0+(tx(x)-tx(lim[0]))/(tx(lim[1])-tx(lim[0]))*(W-L0-R0),Y=y=>H-B0-(tx(y)-tx(lim[0]))/(tx(lim[1])-tx(lim[0]))*(H-T0-B0);
+    const zero=pfm?1:0;g.clearRect(0,0,W,H);
+    // quadrant shading: works before and after
+    g.fillStyle=C("--good-bg");g.globalAlpha=0.6;g.fillRect(X(zero),T0,W-R0-X(zero),Y(zero)-T0);g.globalAlpha=1;
+    g.strokeStyle=C("--line");g.lineWidth=1;g.beginPath();g.moveTo(X(zero),T0);g.lineTo(X(zero),H-B0);g.moveTo(L0,Y(zero));g.lineTo(W-R0,Y(zero));g.stroke();
+    g.setLineDash([3,4]);g.beginPath();g.moveTo(X(lim[0]),Y(lim[0]));g.lineTo(X(lim[1]),Y(lim[1]));g.stroke();g.setLineDash([]);
+    g.fillStyle=C("--muted");g.font="11px system-ui,sans-serif";g.textAlign="center";
+    (pfm?[0.25,0.5,1,2,4]:[lim[0],lim[0]/2,0,lim[1]/2,lim[1]].map(t=>+t.toFixed(3))).forEach((t,ti,arr)=>{const lb=pfm?t+"":((t>0?"+":"")+(+t.toFixed(2))+"R");g.textAlign=ti===arr.length-1?"right":ti===0?"left":"center";g.fillText(lb,X(t)+(ti===arr.length-1?2:0),H-B0+14);t=+t;g.textAlign="right";g.fillText(lb,L0-5,Y(t)+4);g.textAlign="center"});
+    g.fillText("Before "+M.split.slice(0,4)+" (older 70%) →",(L0+W-R0)/2,H-4);
+    g.save();g.translate(10,(T0+H-B0)/2);g.rotate(-Math.PI/2);g.fillText("Since then (newest 30%) →",0,0);g.restore();
+    g.textAlign="right";g.fillStyle=C("--good");g.font="600 11px system-ui,sans-serif";g.fillText("Worked before and after",W-R0-4,T0+12);
+    g.textAlign="right";g.fillStyle=C("--bad");g.fillText("Stopped working",W-R0-4,H-B0-6);
+    const maxN=Math.max(1,...Z.map(z=>z.n)),pts=[];
+    const sorted=Z.filter(z=>z.en>0).sort((a,b)=>b.n-a.n);
+    for(const z of sorted){const xv=pfm?z.tp:z.ta,yv=pfm?z.ep:z.ea;if(xv==null||yv==null)continue;const x=X(xv),y=Y(yv),r=2.5+9*Math.sqrt(z.n/maxN);
+      const base=pfm?1:0,b4=xv>base,af=yv>base;
+      g.beginPath();g.arc(x,y,r,0,7);g.fillStyle=b4&&af?C("--good"):(!b4&&!af?C("--bad"):(b4?C("--warn"):C("--muted")));g.globalAlpha=z===sel?1:0.55;g.fill();g.globalAlpha=1;
+      if(z===sel){g.lineWidth=2.5;g.strokeStyle=C("--ink");g.stroke()}pts.push({x,y,r,z})}
+    view={pts};
+    const held=Z.filter(z=>z.v==="holds"||z.v==="weaker").length;
+    $("#ex-cap").innerHTML=`${T.length.toLocaleString("en-IN")} trades · ${Z.length.toLocaleString("en-IN")} zones with ${st.minN}+ trades · <b style="color:var(--good)">${held}</b> worked before and after. <span style="color:var(--good)">●</span> worked both times <span style="color:var(--warn)">●</span> stopped working <span style="color:var(--bad)">●</span> never worked · size = trades · tap a dot`;
+    if(!panel)return;
+    if(!sel){const best=Z.filter(z=>z.v==="holds").sort((a,b)=>Math.min(b.ta,b.ea)*Math.sqrt(b.n)-Math.min(a.ta,a.ea)*Math.sqrt(a.n));showTop(best)}else detail(sel)}
+  function hit(e){const cv=$("#ex-map"),r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=1e9;
+    for(const p of (view||{pts:[]}).pts){const d=Math.hypot(p.x-x,p.y-y);if(d<Math.max(p.r,10)&&d<bd){bd=d;best=p}}return {best,x,y}}
+  function showTop(best){const el=$("#ex-sel");if(!best.length){el.innerHTML='<div class="card note">No zone kept working after the split date with these settings.</div>';return}
+    el.innerHTML=`<div class="card"><h3>Best zones that kept working</h3><div class="extop">${best.slice(0,6).map((z,i)=>`<button data-i="${i}"><span>${esc(zname(z))}</span><span class="mono" style="white-space:nowrap;color:var(--good)">${r2(z.ta)} → ${r2(z.ea)}R · ${z.n}</span></button>`).join("")}</div></div>`;
+    el.querySelectorAll("button[data-i]").forEach(b=>b.onclick=()=>{sel=best[+b.dataset.i];draw()})}
+  function detail(z){const el=$("#ex-sel");const rs=T.filter(t=>z.cb.every((f,j)=>B[f].code(t.x[f])===z.parts[j]));
+    const sy={};rs.forEach(t=>sy[t.sym]=(sy[t.sym]||0)+1);const topS=Object.entries(sy).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const others=FK.filter(f=>!z.cb.includes(f));const sf=st.splitBy&&others.includes(st.splitBy)?st.splitBy:others[0];
+    el.innerHTML=`<div class="card"><div class="exsel"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div class="rules">${z.cb.map((f,j)=>`${esc(F[f].label)}: <b>${esc(B[f].labels[z.parts[j]])}</b>`).join("<br>")}</div><div>${vp(z.v)} <button id="ex-x" aria-label="Close">✕</button></div></div>
+     <div class="exnum"><div><b>${z.n}</b><span>trades</span></div><div><b style="color:var(${z.avg>0?"--good":"--bad"})">${r2(z.avg)}R</b><span>average</span></div><div><b>${z.pf==null?"–":nf(z.pf,2)}</b><span>profit factor</span></div><div><b>${r2(z.ta)} → ${r2(z.ea)}</b><span>before → after (n ${z.tn} / ${z.en})</span></div></div></div>
+     <div class="row" style="gap:8px;margin-top:12px;align-items:center"><span class="note">Split this zone by</span><select id="ex-sf">${others.map(f=>`<option value="${f}"${f===sf?" selected":""}>${esc(F[f].label)}</option>`).join("")}</select></div><div class="exsplit" id="ex-sp"></div>
+     ${st.scope!=="stock"?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:12px"><span class="note">Most trades:</span>${topS.map(([s,k])=>`<button class="pill p-neutral" data-s="${esc(s)}">${esc(s)} ${k}</button>`).join("")}</div>`:""}</div>`;
+    const split=()=>{const f=$("#ex-sf").value;st.splitBy=f;exSave(st);const g={};rs.forEach(t=>{const c=B[f].code(t.x[f]);(g[c]=g[c]||[]).push(t.R)});
+      const rows=Object.entries(g).map(([c,a])=>({l:B[f].labels[c],s:exStats(a)})).filter(o=>o.l!=="n/a").sort((a,b)=>B[f].labels.indexOf(a.l)-B[f].labels.indexOf(b.l));
+      const mx=Math.max(0.2,...rows.map(o=>Math.abs(o.s.avg)));
+      $("#ex-sp").innerHTML=rows.map(o=>`<span>${esc(o.l)}</span><div style="display:flex;align-items:center;height:14px"><div style="width:50%;display:flex;justify-content:flex-end">${o.s.avg<0?`<div class="bar" style="width:${Math.abs(o.s.avg)/mx*100}%;background:var(--bad);opacity:${o.s.n<10?0.35:0.9}"></div>`:""}</div><div style="width:50%;border-left:1px solid var(--line)">${o.s.avg>0?`<div class="bar" style="width:${o.s.avg/mx*100}%;background:var(--good);opacity:${o.s.n<10?0.35:0.9}"></div>`:""}</div></div><span class="mono" style="text-align:right">${r2(o.s.avg)} <span class="note">${o.s.n}</span></span>`).join("")};
+    $("#ex-sf").onchange=split;split();$("#ex-x").onclick=()=>{sel=null;draw()};
+    el.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>goCompany(b.dataset.s))}
+  function varsUI(){$("#ex-vars").innerHTML=FK.filter(f=>F[f].kind==="num").map(f=>`<div><span style="font-size:13px">${esc(F[f].label)}</span><input data-b="${f}" value="${esc(st.bins[f]??EX_BINS[f]??"auto:4")}" aria-label="Steps for ${esc(F[f].label)}"></div>`).join("");
+    $("#ex-vars").querySelectorAll("[data-b]").forEach(inp=>inp.onchange=()=>{st.bins[inp.dataset.b]=inp.value;save();sel=null;compute()})}
+  const cv=$("#ex-map"),tip=$("#ex-tip");
+  cv.addEventListener("mousemove",e=>{const {best,x,y}=hit(e);if(!best){tip.hidden=true;return}const z=best.z;tip.hidden=false;
+    tip.innerHTML=`<b>${esc(zname(z))}</b><br>${z.n} trades · ${r2(z.avg)}R · PF ${z.pf==null?"–":nf(z.pf,2)}<br>before ${r2(z.ta)} → after ${r2(z.ea)}`;
+    const w=cv.clientWidth;tip.style.left=Math.min(w-270,Math.max(0,x+12))+"px";tip.style.top=Math.max(0,y-10)+"px"});
+  cv.addEventListener("mouseleave",()=>tip.hidden=true);
+  cv.addEventListener("click",e=>{const {best}=hit(e);tip.hidden=true;sel=best?best.z:null;draw();if(best&&window.innerWidth<700)$("#ex-sel").scrollIntoView({behavior:"smooth",block:"start"})});
+  $("#ex-scope").onchange=e=>{st.scope=e.target.value;if(st.scope==="all"&&st.minN<100)st.minN=100;if(st.scope==="stock"&&st.minN>30)st.minN=10;$("#ex-min").value=st.minN;save();loadTrades()};
   $("#ex-sym").onchange=e=>{st.sym=e.target.value;save();loadTrades()};
-  $("#ex-min").onchange=e=>{st.minN=+e.target.value;save();draw()};
-  $("#ex-thr").onchange=e=>{st.thr=+e.target.value;save();draw()};
-  $("#ex-add").onchange=e=>{if(e.target.value){st.vars.push(e.target.value);zoom=[];selPath=null;save();draw()}};
-  $("#ex-d3").onchange=e=>{st.depth3=e.target.checked;save()};$("#ex-scan").onclick=scan;
-  Object.keys(EX_RULE).forEach(k=>{const el=$("#r-"+k);if(el)el.onchange=()=>{rule[k]=k==="use_target"?el.value==="true":+el.value;ruleStd=false;save();loadTrades().then(save)}});
-  $("#ex-rreset").onclick=()=>{Object.assign(rule,EX_RULE);Object.keys(EX_RULE).forEach(k=>{const el=$("#r-"+k);if(el)el.value=String(EX_RULE[k])});save();loadTrades().then(save)};
-  let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(location.hash.slice(1)==="explore"&&$("#ex-tree"))draw()},200)});
-  await loadTrades();
+  $("#ex-k").onchange=e=>{st.k=+e.target.value;save();sel=null;compute()};
+  $("#ex-min").onchange=e=>{st.minN=+e.target.value;save();sel=null;compute()};
+  $("#ex-metric").onchange=e=>{st.metric=e.target.value;save();draw()};
+  Object.keys(EX_RULE).forEach(k=>{const el=$("#r-"+k);if(el)el.onchange=()=>{rule[k]=k==="use_target"?el.value==="true":+el.value;save();loadTrades().then(save)}});
+  if(S.exResize)window.removeEventListener("resize",S.exResize);let rt,lw=window.innerWidth;
+  S.exResize=()=>{if(window.innerWidth===lw)return;lw=window.innerWidth;clearTimeout(rt);rt=setTimeout(()=>{if(location.hash.slice(1)==="explore"&&$("#ex-map"))draw(false)},200)};
+  window.addEventListener("resize",S.exResize);
+  varsUI();await loadTrades();
 }
 async function viewNews(){
   const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
