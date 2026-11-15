@@ -35,12 +35,12 @@ header.mast{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;backgroun
 .brand{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.01em;white-space:nowrap;display:flex;align-items:center;gap:8px;color:var(--ink);text-decoration:none}
 .brand img{width:30px;height:30px;flex:none}
 .brand small{font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);margin-left:6px}
-nav.tabs{display:flex;gap:2px;flex-wrap:wrap}
+nav.tabs{display:flex;gap:2px;flex:1 1 0;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}nav.tabs::-webkit-scrollbar{display:none}nav.tabs a{white-space:nowrap}
 nav.tabs a{padding:6px 12px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500}
 nav.tabs a:hover{background:var(--soft);color:var(--ink)}
 nav.tabs a.on{background:var(--accent);color:var(--accent-ink)}
 #selco{margin-left:auto;flex:none}#selco+.search{margin-left:8px}
-.search{margin-left:auto;position:relative;min-width:0;flex:0 1 280px}
+.search{margin-left:auto;position:relative;min-width:140px;flex:0 1 240px}
 .search input{width:100%}
 input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
 button{cursor:pointer}
@@ -155,6 +155,7 @@ td .sy{color:var(--muted);font-size:11px;font-family:var(--f-mono)}
 .prose p,.prose li{line-height:1.65}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:var(--s6)}
+nav.tabs{order:3;flex:1 1 100%}
 /* ---- phones ---- */
 @media (max-width:640px){
   .mast .wrap{gap:8px;padding-block:8px}
@@ -199,6 +200,7 @@ footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px 
     <a href="#sector" data-v="sector">Sector peers</a>
     <a href="#factors" data-v="factors">Factor vs factor</a>
     <a href="#news" data-v="news">Announcements</a>
+    <a href="#notes" data-v="notes">Notes</a>
     <a href="#method" data-v="method">Method</a>
   </nav>
   <a id="selco" class="pill p-neutral" href="#company" hidden title="Selected company (kept across tabs)" style="text-decoration:none">Selected <b class="mono"></b></a>
@@ -293,6 +295,7 @@ function routeView(h){
   if(h==="explore")return viewExplore();
   if(h==="news")return viewNews();
   if(h==="method")return viewMethod();
+  if(h==="notes")return window.HisNotes?HisNotes.renderList($("#view")):($("#view").innerHTML='<div class="empty">Notes did not load.</div>');
   return viewScreen();
 }
 window.addEventListener("hashchange",route);
@@ -843,7 +846,7 @@ async function viewSetups(){
     W.forEach(([k])=>o.weights[k]=+$("#r-w-"+k).value);v.querySelectorAll("[data-rp]").forEach(x=>o.patterns[x.dataset.rp]=x.checked);v.querySelectorAll("[data-rk]").forEach(x=>o.kinds[x.dataset.rk]=x.checked);v.querySelectorAll("[data-rl]").forEach(x=>o.level_types[x.dataset.rl]=x.checked);return o};
   // ---------- draw
   const card=(r,i,cls)=>{const E=r._E,n=E.filter(e=>e.ok).length;
-    return `<div class="call${cls||""}" data-i="${i}"><h4><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"BUY":"SELL"}</span><span class="mono">${esc(r.symbol)}</span><span class="note" style="font-weight:400">${esc(r.date.slice(5))}</span><span class="note" style="margin-left:auto;font-weight:400">${n}/${E.length} reasons</span></h4>
+    return `<div class="call${cls||""}" data-i="${i}"><h4><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"BUY":"SELL"}</span><span class="mono">${esc(r.symbol)}</span><span class="note" style="font-weight:400">${esc(r.date.slice(5))}</span><span class="note" style="margin-left:auto;font-weight:400">${n}/${E.length} reasons</span><button class="pill p-neutral" data-note="${i}" title="Save this call to notes" style="cursor:pointer">+ Note</button></h4>
      <div class="sub">${esc(P[r.pattern]||r.pattern)} ${r.kind==="test"?(r.dir>0?"holding support":"rejected at resistance"):(r.dir>0?"breaking resistance":"breaking support")} ${px(r.lo)}${r.hi!==r.lo?"–"+px(r.hi):""} · score ${r._sc}</div>
      <ul class="why">${E.map(e=>`<li><span class="${e.ok?"y":"n"}">${e.ok?"✓":"·"}</span><span${e.ok?"":' class="note"'}>${e.t}</span></li>`).join("")}</ul></div>`};
   let shown=[];
@@ -861,6 +864,9 @@ async function viewSetups(){
       :`<div class="card"><p style="margin:0">No setup has ${need}+ reasons right now.</p><p class="note" style="margin:6px 0 0">Of ${rows.length} setups: ${cnt.zone} in a validated zone, ${cnt.model} with good model odds, ${cnt.behave} fit the stock's zone behaviour, ${cnt.strategy} taken by a live strategy. Lower "reasons" or loosen the call settings.</p></div>`;
     $("#c-on").textContent=`· ${rest.length}`;
     $("#c-ot").innerHTML=rest.length?`<div class="tablewrap"><table><thead><tr><th>Setup</th><th>Company</th><th class="hs">Day</th><th class="n">Score</th><th class="n">Reasons</th></tr></thead><tbody>${rest.map(r=>`<tr data-i="${shown.indexOf(r)}" style="cursor:pointer"><td><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(PATSHORT[r.pattern]||r.pattern)}</span></td><td><b class="mono">${esc(r.symbol)}</b></td><td class="hs mono">${esc(r.date.slice(5))}</td><td class="n">${r._sc}</td><td class="n">${r._n}/${r._E.length}</td></tr>`).join("")}</tbody></table></div>`:'<p class="note">None.</p>';
+    v.querySelectorAll("[data-note]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=shown[+b.dataset.note];if(!r||!window.HisNotes)return;
+      const txt=`${r.dir>0?"BUY":"SELL"} ${r.symbol} · ${P[r.pattern]||r.pattern} ${r.date} · score ${r._sc}\n`+r._E.map(x=>(x.ok?"✓ ":"· ")+x.t.replace(/<[^>]+>/g,"")).join("\n")+"\n\nMy view: ";
+      HisNotes.capture(b.closest(".call"),{title:`${r.dir>0?"BUY":"SELL"} ${r.symbol} · ${r.date}`,text:txt,url:"#company-"+encodeURIComponent(r.symbol)})});
     v.querySelectorAll("[data-i]").forEach(el=>el.onclick=()=>{const i=+el.dataset.i,r=shown[i];if(!r)return;S.focusSetup={sym:r.symbol,date:r.date};
       S.setupNav={list:shown.map(y=>({sym:y.symbol,date:y.date,sc:y._sc,pattern:y.pattern,dir:y.dir})),i};goCompany(r.symbol)})};
   $("#c-days").onchange=e=>{C.days=+e.target.value;callSave(C);draw()};
@@ -1297,3 +1303,4 @@ function viewMethod(){
 })();
 </script>
 <script src="assets/ask-claude.js?v=1"></script>
+<script src="assets/notes.js?v=1"></script>
