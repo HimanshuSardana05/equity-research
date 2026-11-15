@@ -101,6 +101,11 @@ def main():
     print("screener imports:", import_all(), flush=True)
     n = build_all(uni)
     print("built", n, "companies", flush=True)
+    try:  # zone-to-zone (deflecting vs directional) page
+        from zones import build as build_zones
+        build_zones(uni)
+    except Exception as e:
+        print("zones failed:", repr(e), flush=True)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,276 @@
+<title>Zones · HIS Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap">
+<style>
+:root{
+  --bg:#f5f7fa; --panel:#ffffff; --ink:#14202e; --muted:#5b6b7d; --line:#dfe5ec; --soft:#eef2f7;
+  --accent:#1d5fd1; --accent-ink:#ffffff; --chart-grid:#edf1f5;
+  --defl:#2f6fe0; --dir:#d9822b; --mix:#9aa7b6; --up:#0f9d58; --down:#d93025;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
+  --accent:#6aa1ff; --accent-ink:#0b1220; --chart-grid:#1c2633;
+  --defl:#5b93f5; --dir:#e9973f; --mix:#66758a; --up:#2fd384; --down:#ff4d4d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
+  --accent:#6aa1ff; --accent-ink:#0b1220; --chart-grid:#1c2633;
+  --defl:#5b93f5; --dir:#e9973f; --mix:#66758a; --up:#2fd384; --down:#ff4d4d; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1280px;margin:0 auto}
+header.mast{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.mast .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:10px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:19px;display:flex;align-items:center;gap:8px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand img{width:30px;height:30px}
+.back{color:var(--muted);text-decoration:none;font-weight:500;padding:6px 10px;border-radius:6px}.back:hover{background:var(--soft);color:var(--ink)}
+.search{margin-left:auto;position:relative;flex:0 1 260px;min-width:0}
+input,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+.search input{width:100%}
+button{cursor:pointer}button:hover{background:var(--soft)}button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sugg{position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;margin-top:4px;max-height:300px;overflow:auto;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.sugg div{padding:6px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}.sugg div:hover,.sugg div.hl{background:var(--soft)}.sugg span{color:var(--muted);font-size:12px}
+main{padding-block:20px;display:grid;gap:16px}
+h1,h2,h3{font-family:var(--f-display);margin:0}
+h1{font-size:24px}h2{font-size:20px}
+h3{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.between{justify-content:space-between}
+.muted{color:var(--muted)}.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;padding:5px 12px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px}
+.top{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.top{grid-template-columns:minmax(0,1fr)}}
+#sc{position:relative;height:360px}#sc canvas{position:absolute;inset:0;width:100%;height:100%}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.14);white-space:nowrap;z-index:4}
+.qlab{position:absolute;font:600 11px var(--f-mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;pointer-events:none}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-weight:600;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none;font-size:12px}
+td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.n,td.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer}tbody tr:hover{background:var(--soft)}tbody tr.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.tw{overflow:auto;max-height:340px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--soft);border-radius:8px;padding:10px 12px}
+.tile b{display:block;font:600 26px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted)}
+.now{font-size:14px;padding:8px 12px;border-radius:8px;background:var(--soft)}
+.chart{height:440px;position:relative}
+.chart canvas.ov{position:absolute;inset:0;pointer-events:none;z-index:0}
+.chart>.tv-lightweight-charts{position:relative;z-index:1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+
+<header class="mast"><div class="wrap">
+  <a class="brand" href="./"><img src="assets/logo-64.png" alt="" width="30" height="30">Zones</a>
+  <a class="back" href="./#setups">← Research desk</a>
+  <div class="search"><input id="q" placeholder="Find a stock" autocomplete="off" aria-label="Find a stock"><div class="sugg" id="sugg" hidden></div></div>
+</div></header>
+
+<main class="wrap" id="main">
+  <section class="top">
+    <div class="card">
+      <div class="row between"><h3>Deflecting vs directional · last 1 year</h3>
+        <div class="seg" id="cls"><button data-c="" class="on">All</button><button data-c="deflecting">Deflecting</button><button data-c="directional">Directional</button></div></div>
+      <div id="sc"><canvas id="scc"></canvas></div>
+      <div class="legend"><span><span class="dot" style="background:var(--defl)"></span> Deflecting</span><span><span class="dot" style="background:var(--dir)"></span> Directional</span><span><span class="dot" style="background:var(--mix)"></span> Mixed</span><span>Dot size = zone-to-zone moves</span></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:8px">Ranked</h3>
+      <div class="tw"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="card" id="det"><div class="empty">Loading…</div></section>
+</main>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+"use strict";
+const $=(s,el=document)=>el.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const nf=(x,d=0)=>x==null||!isFinite(x)?"–":Number(x).toLocaleString("en-IN",{maximumFractionDigits:d,minimumFractionDigits:d});
+const px=x=>nf(x,x<100?2:0);
+const pc=x=>x==null?"–":Math.round(x*100)+"%";
+const zr=z=>z?`${px(z[0])}–${px(z[1])}`:"–";
+const CLS={deflecting:["Deflecting","--defl"],directional:["Directional","--dir"],mixed:["Mixed","--mix"],thin:["Few tests","--mix"]};
+const S={rows:[],cls:"",sort:"score",dir:-1,sel:null,chart:null,raf:0};
+const file=s=>"data/zones/"+s.replace(/&/g,"_")+".json";
+
+function nowText(r,close){
+  const n=r.now||{},d=n.days,ago=d==null?"":d===0?"today":d===1?"1 day ago":d+" days ago";
+  const dist=z=>z?((((z[0]+z[1])/2)/close-1)*100).toFixed(1).replace(/^(?!-)/,"+")+"%":"";
+  switch(n.kind){
+    case"at_res":return`Testing resistance ${zr(n.zone)} · next support ${zr(n.below)} <span class="muted">${dist(n.below)}</span>`;
+    case"at_sup":return`Testing support ${zr(n.zone)} · next resistance ${zr(n.above)} <span class="muted">${dist(n.above)}</span>`;
+    case"defl_res":return`Rejected at resistance ${zr(n.zone)} ${ago} → support ${zr(n.target)} ${n.res==="reached"?"✓ reached":`<span class="muted">${dist(n.target)}</span>`}`;
+    case"defl_sup":return`Bounced off support ${zr(n.zone)} ${ago} → resistance ${zr(n.target)} ${n.res==="reached"?"✓ reached":`<span class="muted">${dist(n.target)}</span>`}`;
+    case"brk_up":return`Broke up through ${n.leg} zone${n.leg>1?"s":""} (${ago}) · next ${zr(n.above)}`;
+    case"brk_dn":return`Broke down through ${n.leg} zone${n.leg>1?"s":""} (${ago}) · next ${zr(n.below)}`;
+    default:return`Between zones · support ${zr(n.below)} · resistance ${zr(n.above)}`;
+  }
+}
+const shortNow=n=>({at_res:"At resistance",at_sup:"At support",defl_res:"Rejected ↓",defl_sup:"Bounced ↑",brk_up:"Breakout ↑",brk_dn:"Breakdown ↓"})[n&&n.kind]||"Between";
+
+/* ---------- scatter ---------- */
+function scatter(){
+  const box=$("#sc"),cv=$("#scc"),dpr=devicePixelRatio||1,W=box.clientWidth,H=box.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);g.clearRect(0,0,W,H);
+  const M={l:44,r:12,t:12,b:34},iw=W-M.l-M.r,ih=H-M.t-M.b;
+  const rows=S.rows.filter(r=>r.y1.class!=="thin");
+  const xmax=Math.max(60,...rows.map(r=>r.y1.score)),ymax=Math.max(3,...rows.map(r=>r.y1.leg_zones||1));
+  const X=v=>M.l+v/xmax*iw,Y=v=>M.t+ih-(v-1)/(ymax-1)*ih;
+  g.strokeStyle=css("--chart-grid");g.fillStyle=css("--muted");g.font="11px IBM Plex Mono";g.lineWidth=1;
+  for(let v=0;v<=xmax;v+=20){g.beginPath();g.moveTo(X(v),M.t);g.lineTo(X(v),M.t+ih);g.stroke();g.fillText(v,X(v)-6,H-M.b+14)}
+  for(let v=1;v<=ymax;v+=.5){g.beginPath();g.moveTo(M.l,Y(v));g.lineTo(M.l+iw,Y(v));g.stroke();g.fillText(v.toFixed(1),8,Y(v)+4)}
+  g.fillText("Mean-reversion score →",M.l+iw-170,H-4);
+  g.fillText("↑ Zones per breakout",M.l+6,M.t+10);
+  const col={deflecting:css("--defl"),directional:css("--dir"),mixed:css("--mix")},panel=css("--panel");
+  S.pts=[];
+  const order=[...rows].sort((a,b)=>(a.y1.class===S.cls)-(b.y1.class===S.cls));
+  for(const r of order){
+    const dim=S.cls&&r.y1.class!==S.cls;
+    const x=X(r.y1.score),y=Y(Math.min(ymax,r.y1.leg_zones||1)),rad=3+Math.sqrt(r.y1.z2z)*1.6;
+    g.globalAlpha=dim?.12:.8;g.fillStyle=col[r.y1.class];g.beginPath();g.arc(x,y,rad,0,7);g.fill();
+    g.globalAlpha=1;g.strokeStyle=panel;g.lineWidth=1;g.stroke();
+    if(!dim)S.pts.push({x,y,rad,r});
+  }
+  if(S.sel){const p=S.pts.find(p=>p.r.sym===S.sel);if(p){g.strokeStyle=css("--ink");g.lineWidth=2;g.beginPath();g.arc(p.x,p.y,p.rad+3,0,7);g.stroke();
+    g.fillStyle=css("--ink");g.font="600 12px IBM Plex Mono";g.fillText(p.r.sym,p.x+p.rad+5,p.y-4)}}
+}
+function scHit(e){const b=$("#scc").getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;let best=null,bd=1e9;
+  for(const p of S.pts){const d=Math.hypot(p.x-x,p.y-y);if(d<Math.max(10,p.rad+4)&&d<bd){bd=d;best=p}}return best}
+function scInit(){
+  const cv=$("#scc"),box=$("#sc");let tip=null;
+  cv.addEventListener("mousemove",e=>{const p=scHit(e);cv.style.cursor=p?"pointer":"default";
+    if(!p){tip&&tip.remove();tip=null;return}
+    if(!tip){tip=document.createElement("div");tip.className="tip";box.appendChild(tip)}
+    const s=p.r.y1;tip.innerHTML=`<b class="mono">${esc(p.r.sym)}</b> <span class="muted">${esc(CLS[s.class][0])}</span><br>${s.z2z} zone-to-zone moves · reach ${pc(s.reach)}<br>${s.brk} breakouts · ${s.leg_zones??"–"} zones each`;
+    tip.style.left=Math.min(p.x+12,box.clientWidth-200)+"px";tip.style.top=(p.y+12)+"px"});
+  cv.addEventListener("mouseleave",()=>{tip&&tip.remove();tip=null});
+  cv.addEventListener("click",e=>{const p=scHit(e);if(p)select(p.r.sym,true)});
+}
+
+/* ---------- table ---------- */
+const COLS=[{k:"sym",l:"Stock"},{k:"class",l:""},{k:"z2z",l:"Z→Z 1y",n:1},{k:"reach",l:"Reach",n:1},{k:"leg_zones",l:"Zones/brk",n:1},{k:"score",l:"Score",n:1},{k:"now",l:"Now"}];
+const val=(r,k)=>k==="sym"?r.sym:k==="now"?shortNow(r.now):k==="class"?r.y1.class:r.y1[k];
+function table(){
+  $("#th").innerHTML="<tr>"+COLS.map(c=>`<th class="${c.n?"n":""}" data-k="${c.k}">${c.l}${S.sort===c.k?(S.dir>0?" ▲":" ▼"):""}</th>`).join("")+"</tr>";
+  const rows=S.rows.filter(r=>!S.cls||r.y1.class===S.cls).sort((a,b)=>{const x=val(a,S.sort),y=val(b,S.sort);return(x==null)-(y==null)||(x<y?-1:x>y?1:0)*S.dir});
+  $("#tb").innerHTML=rows.map(r=>{const c=CLS[r.y1.class];return`<tr data-s="${esc(r.sym)}" class="${r.sym===S.sel?"sel":""}"><td><b class="mono">${esc(r.sym)}</b></td><td title="${c[0]}"><span class="dot" style="background:var(${c[1]})"></span></td><td class="n"><b>${r.y1.z2z}</b></td><td class="n">${pc(r.y1.reach)}</td><td class="n">${r.y1.leg_zones??"–"}</td><td class="n">${Math.round(r.y1.score)}</td><td class="muted">${shortNow(r.now)}</td></tr>`}).join("");
+}
+
+/* ---------- detail ---------- */
+async function select(sym,scroll){
+  S.sel=sym;history.replaceState(null,"","#"+encodeURIComponent(sym));scatter();table();
+  const r=S.rows.find(x=>x.sym===sym);const det=$("#det");
+  let D;try{D=await (await fetch(file(sym))).json()}catch(e){det.innerHTML='<div class="empty">No zone data for this stock.</div>';return}
+  if(S.sel!==sym)return;
+  const s=D.y1,c=CLS[s.class];
+  det.innerHTML=`<div class="row between" style="margin-bottom:12px"><div class="row" style="gap:12px"><h2 class="mono">${esc(sym)}</h2><span class="muted">${esc(r?r.name:"")}</span><span class="pill"><span class="dot" style="background:var(${c[1]})"></span>${c[0]}</span></div>
+    <div class="seg" id="rng"><button data-r="250" class="on">1Y</button><button data-r="0">2Y</button></div></div>
+    <div class="tiles">
+      <div class="tile"><b>${s.z2z}</b><span>zone-to-zone moves</span></div>
+      <div class="tile"><b>${pc(s.reach)}</b><span>deflections reaching the opposite zone (${s.z2z} of ${s.z2z+s.failed})</span></div>
+      <div class="tile"><b>${s.days_in??"–"}<small style="font-size:14px"> d</small></b><span>typical time inside a zone</span></div>
+      <div class="tile"><b>${s.leg_zones??"–"}</b><span>zones per breakout (${s.brk} breaks, max ${s.leg_max})</span></div>
+    </div>
+    <div class="now" style="margin:12px 0">${nowText(D,D.c[D.c.length-1])}</div>
+    <div class="chart" id="ch"><canvas class="ov" id="ov"></canvas></div>
+    <div class="legend" style="margin-top:8px"><span><i style="background:color-mix(in srgb,var(--muted) 22%,transparent)"></i>Zone</span><span><i style="background:var(--defl)"></i>Deflection reached opposite zone</span><span><i style="background:var(--mix)"></i>Deflection fell short</span><span><i style="background:var(--dir)"></i>Breakout (number = zones broken)</span></div>
+    <details style="margin-top:12px"><summary>Every zone test (${D.events.filter(e=>e.s>=D.year_start).length} in the last year)</summary><div class="tw" style="margin-top:6px"><table><thead><tr><th>Date</th><th>Zone</th><th>Tested as</th><th>Result</th><th class="n">Days in zone</th><th class="n">Move</th></tr></thead><tbody>${
+      D.events.slice().reverse().filter(e=>e.s>=D.year_start).map(e=>`<tr data-i="${e.s}"><td class="mono">${D.t[e.s]}</td><td class="mono">${zr([e.lo,e.hi])}</td><td>${e.side>0?"Resistance":"Support"}</td><td>${e.out==="B"?`Broke ${e.side>0?"up":"down"}${e.leg>1?` · ${e.leg} zones`:""}`:e.out==="D"?(e.res==="reached"?`→ ${zr([e.tlo,e.thi])} in ${e.r-e.e}d`:e.res==="failed"?"Back to zone":e.res==="pending"?"On the way":"No zone beyond"):"In zone now"}</td><td class="n">${e.e-e.s+1}</td><td class="n">${e.res==="reached"?(e.move*100).toFixed(1)+"%":""}</td></tr>`).join("")}</tbody></table></div></details>`;
+  draw(D,250);
+  det.querySelectorAll("#rng button").forEach(b=>b.onclick=()=>{det.querySelectorAll("#rng button").forEach(x=>x.classList.toggle("on",x===b));fit(D,+b.dataset.r)});
+  det.querySelector("details tbody").onclick=e=>{const tr=e.target.closest("tr");if(tr)focusBar(D,+tr.dataset.i)};
+  if(scroll)det.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function fit(D,n){const ts=S.chart.timeScale(),N=D.t.length;ts.setVisibleLogicalRange({from:n?N-n:0,to:N+3})}
+function focusBar(D,i){S.chart.timeScale().setVisibleLogicalRange({from:i-40,to:i+40});$("#ch").scrollIntoView({behavior:"smooth",block:"center"})}
+
+function draw(D,n){
+  if(S.chart){S.chart.remove();cancelAnimationFrame(S.raf)}
+  const el=$("#ch");
+  const ch=LightweightCharts.createChart(el,{autoSize:true,
+    layout:{background:{type:"solid",color:"transparent"},textColor:css("--muted"),fontFamily:"IBM Plex Mono, monospace",fontSize:11},
+    grid:{vertLines:{visible:false},horzLines:{color:css("--chart-grid")}},
+    rightPriceScale:{borderColor:css("--line")},timeScale:{borderColor:css("--line"),rightOffset:3},crosshair:{mode:0},
+    localization:{priceFormatter:px}});
+  S.chart=ch;
+  const cs=ch.addCandlestickSeries({upColor:css("--up"),downColor:css("--down"),borderVisible:false,wickUpColor:css("--up"),wickDownColor:css("--down"),priceLineVisible:false});
+  cs.setData(D.t.map((t,i)=>({time:t,open:D.o[i],high:D.h[i],low:D.l[i],close:D.c[i]})));
+  const mk=[];
+  for(const e of D.events){
+    if(e.out==="D"){const good=e.res==="reached";
+      mk.push({time:D.t[e.e],position:e.side>0?"aboveBar":"belowBar",shape:e.side>0?"arrowDown":"arrowUp",color:good?css("--defl"):css("--mix"),size:good?1.2:.8});}
+    else if(e.out==="B"&&e.leg){mk.push({time:D.t[e.e],position:e.side>0?"belowBar":"aboveBar",shape:"square",color:css("--dir"),text:String(e.leg),size:.9})}
+  }
+  mk.sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);cs.setMarkers(mk);
+  fit(D,n);
+  const ov=$("#ov"),g=ov.getContext("2d"),ts=ch.timeScale();
+  const col={z:css("--muted"),d:css("--defl"),dir:css("--dir"),m:css("--mix")};
+  const tc=i=>ts.logicalToCoordinate(i);
+  const frame=()=>{
+    const dpr=devicePixelRatio||1,W=el.clientWidth,H=el.clientHeight;
+    if(ov.width!==W*dpr||ov.height!==H*dpr){ov.width=W*dpr;ov.height=H*dpr}
+    g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+    const pw=W-ch.priceScale("right").width(),ph=H-ts.height();
+    g.save();g.beginPath();g.rect(0,0,pw,ph);g.clip();
+    const bw=Math.max(1,(tc(1)-tc(0))||1);
+    // zone ladder through time
+    g.fillStyle=col.z;
+    for(const[lo,hi,s,e]of D.zones){const x0=tc(s)-bw/2,x1=tc(e)+bw/2,y0=cs.priceToCoordinate(hi),y1=cs.priceToCoordinate(lo);
+      if(x1<0||x0>pw||y0==null)continue;g.globalAlpha=.16;g.fillRect(x0,y0,x1-x0,Math.max(2,y1-y0))}
+    // time spent in the zone, and the zone-to-zone path
+    for(const e of D.events){
+      const x0=tc(e.s)-bw/2,x1=tc(e.e)+bw/2;if(x1<0||x0>pw)continue;
+      const y0=cs.priceToCoordinate(e.hi),y1=cs.priceToCoordinate(e.lo);
+      const c=e.out==="B"?col.dir:e.res==="reached"?col.d:col.m;
+      g.globalAlpha=.35;g.fillStyle=c;g.fillRect(x0,y0,x1-x0,Math.max(2,y1-y0));
+      if(e.out==="D"&&e.res==="reached"){
+        const ya=e.side>0?y1:y0,yb=cs.priceToCoordinate(e.side>0?e.thi:e.tlo),xb=tc(e.r);
+        g.globalAlpha=.9;g.strokeStyle=col.d;g.lineWidth=1.5;g.setLineDash([5,4]);
+        g.beginPath();g.moveTo(tc(e.e),ya);g.lineTo(xb,yb);g.stroke();g.setLineDash([]);
+        g.beginPath();g.arc(xb,yb,3,0,7);g.fillStyle=col.d;g.fill();
+      }
+    }
+    g.restore();g.globalAlpha=1;
+    S.raf=requestAnimationFrame(frame);
+  };
+  S.raf=requestAnimationFrame(frame);
+}
+
+/* ---------- search ---------- */
+function search(){
+  const q=$("#q"),sg=$("#sugg");let hl=0,list=[];
+  const show=()=>{const v=q.value.trim().toUpperCase();if(!v){sg.hidden=true;return}
+    list=S.rows.filter(r=>r.sym.includes(v)||(r.name||"").toUpperCase().includes(v)).slice(0,10);hl=0;
+    sg.innerHTML=list.map((r,i)=>`<div data-s="${esc(r.sym)}" class="${i===0?"hl":""}"><b class="mono">${esc(r.sym)}</b><span>${esc(r.name)}</span></div>`).join("");sg.hidden=!list.length};
+  q.addEventListener("input",show);
+  q.addEventListener("keydown",e=>{if(e.key==="Enter"&&list[hl]){pick(list[hl].sym)}else if(e.key==="ArrowDown"||e.key==="ArrowUp"){hl=(hl+(e.key==="ArrowDown"?1:-1)+list.length)%list.length;[...sg.children].forEach((d,i)=>d.classList.toggle("hl",i===hl));e.preventDefault()}else if(e.key==="Escape")sg.hidden=true});
+  sg.addEventListener("mousedown",e=>{const d=e.target.closest("[data-s]");if(d)pick(d.dataset.s)});
+  q.addEventListener("blur",()=>setTimeout(()=>sg.hidden=true,150));
+  const pick=s=>{q.value="";sg.hidden=true;select(s,true)};
+}
+
+(async()=>{
+  try{const A=await (await fetch("data/zones/_all.json")).json();S.rows=A.rows}catch(e){$("#det").innerHTML='<div class="empty">Zone data has not been built yet. It appears after the next data run.</div>';return}
+  scInit();search();scatter();table();
+  $("#cls").onclick=e=>{const b=e.target.closest("button");if(!b)return;S.cls=b.dataset.c;$("#cls").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));scatter();table()};
+  $("#th").onclick=e=>{const th=e.target.closest("th");if(!th)return;const k=th.dataset.k;S.dir=S.sort===k?-S.dir:(k==="sym"||k==="now"?1:-1);S.sort=k;table()};
+  $("#tb").onclick=e=>{const tr=e.target.closest("tr");if(tr)select(tr.dataset.s,true)};
+  addEventListener("resize",()=>scatter());
+  const h=decodeURIComponent(location.hash.slice(1));
+  select(S.rows.some(r=>r.sym===h)?h:(S.rows.some(r=>r.sym==="ITC")?"ITC":S.rows[0].sym),false);
+})();
+</script>

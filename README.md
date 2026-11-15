@@ -14,6 +14,7 @@ undervalued and says why. Research tooling only; this is not investment advice.
 | Factor vs factor | Scatter any two measures across the universe or one sector, coloured by valuation verdict |
 | Announcements | NSE filings for Nifty 500 companies, accumulated daily |
 | Method | The valuation logic and its assumptions |
+| Zones (zones.html) | Zone-to-zone behaviour: for any stock, each deflection, whether it reached the opposite zone, time spent in zones and zones broken per breakout; plus a deflecting vs directional screener (pipeline/zones.py) |
 
 Charts use TradingView's open-source [lightweight-charts](https://github.com/tradingview/lightweight-charts).
 

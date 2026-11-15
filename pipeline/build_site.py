@@ -17,9 +17,7 @@ if _rs.exists():
 _ex = SITE.parent / "data" / "cache" / "explore"  # factor explorer files (one per stock + pooled)
 if _ex.exists():
     shutil.copytree(_ex, dist / "data" / "explore")  # Setups scoring defaults  # Cloudflare Pages password middleware
-body = (SITE / "page.html").read_text()
-(dist / "index.html").write_text(
-    '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+HEAD = ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
     '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
     '<link rel="icon" type="image/png" sizes="32x32" href="assets/logo-32.png?v=5">'
     '<link rel="icon" type="image/png" sizes="192x192" href="assets/logo-192.png?v=5">'
@@ -31,7 +29,10 @@ body = (SITE / "page.html").read_text()
     '<meta name="apple-mobile-web-app-title" content="HIS Research">'
     '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
     '<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}'
-    'body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>\n'
+    'body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>\n')
+for src, out in (("page.html", "index.html"), ("zones.html", "zones.html")):
+  body = (SITE / src).read_text()
+  (dist / out).write_text(HEAD
     + body
     + '\n<script>if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});</script>'
     + "\n</html>\n")
