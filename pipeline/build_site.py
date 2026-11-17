@@ -7,6 +7,9 @@ if dist.exists():
     shutil.rmtree(dist)
 shutil.copytree(SITE / "data", dist / "data")
 shutil.copytree(SITE / "assets", dist / "assets")
+_nw = SITE.parent / "data" / "raw" / "news"  # per-company headlines (pipeline/news.py)
+if _nw.exists():
+    shutil.copytree(_nw, dist / "data" / "news")
 shutil.copy(SITE / "manifest.webmanifest", dist / "manifest.webmanifest")
 shutil.copy(SITE / "sw.js", dist / "sw.js")
 shutil.copytree(SITE / "functions", dist / "functions")

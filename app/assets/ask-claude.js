@@ -40,6 +40,7 @@ How to answer:
     company: ["Why does it get this verdict?", "Explain the levels on the price chart", "What would make it fair value?", "Summarise the quality checks"],
     sector: ["Who is the best business in this sector?", "What does the market reward here?", "Which peer looks mispriced?"],
     factors: ["What does this scatter show?", "Which dots are outliers worth a look?", "Is the market paying for quality here?"],
+    scrip: ["Summarise the latest news with links", "Anything here that could move the stock?", "Which of these stories matter for the business?"],
     news: ["Which announcements matter most?", "Any results due soon?"],
     method: ["Explain the reverse DCF simply", "What are the weak spots of this method?"],
   };
@@ -115,7 +116,8 @@ How to answer:
   /* ---------- helpers ---------- */
   const escH = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function md(src) { // small, escape-first markdown renderer
-    const inline = s => escH(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+    const inline = s => escH(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>")
+      .replace(/\[([^\]]+)\]\((https:\/\/[^\s)"]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     const lines = String(src).replace(/\r/g, "").split("\n"); let out = "", list = null, para = [];
     const flushP = () => { if (para.length) { out += "<p>" + para.map(inline).join("<br>") + "</p>"; para = []; } };
     const flushL = () => { if (list) { out += `</${list}>`; list = null; } };
@@ -136,7 +138,7 @@ How to answer:
     }
     flushP(); flushL(); return out;
   }
-  const tabKey = () => { const h = decodeURIComponent(location.hash.slice(1)) || "screen"; return (h.match(/^(screen|company|sector|factors|news|method)/) || [, "screen"])[1]; };
+  const tabKey = () => { const h = decodeURIComponent(location.hash.slice(1)) || "screen"; return (h.match(/^(screen|company|sector|factors|news|scrip|method)/) || [, "screen"])[1]; };
 
   /* ---------- screen snapshot ---------- */
   function cardTitle(el) { const c = el.closest(".card"); const h = c && c.querySelector("h1,h2,h3"); return h ? h.textContent.trim() : ""; }
@@ -183,6 +185,7 @@ How to answer:
           .map(r => [r.symbol, r.industry, +Number(r[xk]).toPrecision(4), +Number(r[yk]).toPrecision(4), r.verdict, r.coffee_can, Math.round(r.mcap || 0)]);
         return { x: FACT[xk]?.l, y: FACT[yk]?.l, sector_filter: ind || "All sectors", columns: ["symbol", "industry", "x", "y", "verdict", "coffee_can", "mcap_cr"], points: pts };
       }
+      if (tab === "scrip" && S.scripNews) return { company: S.scripNews.name, symbol: S.scripNews.symbol, note: "Headlines from Google News, newest first. Cite them with markdown links [headline](url).", columns: ["date_utc", "headline", "source", "theme", "url"], headlines: S.scripNews.items.slice(0, 40).map(i => [i.d, i.t, i.src, i.theme, i.url]) };
       if (tab === "sector" && S.lastSector) return { sector: S.lastSector };
     } catch (e) { /* the text snapshot still goes */ }
     return null;
@@ -216,7 +219,7 @@ How to answer:
     parts.push("\nVisible text:\n" + visibleText(view));
     const data = await structured(tab);
     if (data) parts.push("\nData behind this view (JSON):\n" + JSON.stringify(data));
-    return { tab, label: tabName + (tab === "company" && S.lastCompany ? " · " + S.lastCompany : tab === "sector" && S.lastSector ? " · " + S.lastSector : ""), text: parts.join("\n"), images: chartImages(tab) };
+    return { tab, label: tabName + (tab === "company" && S.lastCompany ? " · " + S.lastCompany : tab === "sector" && S.lastSector ? " · " + S.lastSector : tab === "scrip" && S.lastCompany ? " · " + S.lastCompany : ""), text: parts.join("\n"), images: chartImages(tab) };
   }
 
   /* ---------- conversation ---------- */
@@ -294,6 +297,7 @@ How to answer:
   function open() { refreshCtx(); panel.classList.add("open"); panel.setAttribute("aria-hidden", "false"); fab.hidden = true; showChips(); if (!getKey()) openSettings(true); else if (matchMedia("(min-width:641px)").matches) ta.focus(); }
   function close() { panel.classList.remove("open"); panel.setAttribute("aria-hidden", "true"); fab.hidden = false; fab.focus(); }
   fab.onclick = open;
+  window.AskClaude = { ask(question) { open(); ask(question); } };
   panel.addEventListener("click", e => {
     const a = e.target.closest("[data-a]"); if (!a) return;
     const act = a.dataset.a;

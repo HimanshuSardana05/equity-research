@@ -156,6 +156,9 @@ td .sy{color:var(--muted);font-size:11px;font-family:var(--f-mono)}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:var(--s6)}
 nav.tabs{order:3;flex:1 1 100%}
+.sn-brief{margin:0;padding-left:18px}.sn-brief li{margin-bottom:8px;line-height:1.45}
+.sn-it{padding:6px 0;border-bottom:1px solid var(--line);line-height:1.4}.sn-it a{color:var(--ink);font-weight:500}.sn-it a:hover{color:var(--accent)}
+.sn-f button{border-radius:999px;font-size:12px;padding:4px 10px;cursor:pointer}.sn-f button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 /* ---- phones ---- */
 @media (max-width:640px){
   .mast .wrap{gap:8px;padding-block:8px}
@@ -197,6 +200,7 @@ nav.tabs{order:3;flex:1 1 100%}
     <a href="zones.html">Zones</a>
     <a href="#screen" data-v="screen">Screen</a>
     <a href="#company" data-v="company">Company</a>
+    <a href="#scrip" data-v="scrip">News</a>
     <a href="#sector" data-v="sector">Sector peers</a>
     <a href="#factors" data-v="factors">Factor vs factor</a>
     <a href="#news" data-v="news">Announcements</a>
@@ -294,6 +298,8 @@ function routeView(h){
   if(h==="research")return viewResearch();
   if(h==="explore")return viewExplore();
   if(h==="news")return viewNews();
+  if(h.startsWith("scrip-"))return viewScrip(dec(h.slice(6)));
+  if(h==="scrip")return viewScrip(S.lastCompany||(S.summary.slice().sort((a,b)=>(b.mcap||0)-(a.mcap||0))[0]||{}).symbol);
   if(h==="method")return viewMethod();
   if(h==="notes")return window.HisNotes?HisNotes.renderList($("#view")):($("#view").innerHTML='<div class="empty">Notes did not load.</div>');
   return viewScreen();
@@ -1267,6 +1273,48 @@ async function viewNews(){
   $("#ns").onchange=draw;$("#nq").oninput=draw;draw();
 }
 
+
+/* ================= NEWS FOR ONE SCRIP ================= */
+const NTHEMES=["Results","Orders and deals","Analyst views","Dividend and capital","Management","Regulatory and legal","Share price","Other"];
+function ago(d){const ms=Date.now()-Date.parse(d+"Z");const h=ms/36e5;return h<1?"just now":h<24?Math.round(h)+"h ago":Math.round(h/24)+"d ago"}
+const safeUrl=u=>/^https:\/\//.test(u||"")?u:"";
+async function viewScrip(sym){
+  const v=$("#view");if(!sym){v.innerHTML='<div class="empty">Pick a company first.</div>';return}
+  selectCompany(sym);v.innerHTML='<div class="empty">Loading news…</div>';
+  const r=(S.summary||[]).find(x=>x.symbol===sym)||{};
+  let nw=null,ev=[];
+  try{nw=await getJSON("data/news/"+sym.replace(/&/g,"_")+".json")}catch(e){}
+  try{ev=(await getJSON("data/events.json")).filter(e=>e.symbol===sym).slice(0,8)}catch(e){}
+  if(location.hash.slice(1)!=="scrip"&&location.hash.slice(1)!=="scrip-"+enc(sym))return;
+  const items=(nw&&nw.items)||[];S.scripNews={symbol:sym,name:r.name||nw?.name||sym,items};
+  const now=Date.now(),inDays=(it,d)=>now-Date.parse(it.d+"Z")<d*864e5;
+  const n7=items.filter(i=>inDays(i,7)).length,n30=items.filter(i=>inDays(i,30)).length;
+  const recent=items.filter(i=>inDays(i,14));
+  const by={};recent.forEach(i=>(by[i.theme]=by[i.theme]||[]).push(i));
+  const lk=i=>safeUrl(i.url)?`<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.t)}</a>`:esc(i.t);
+  const brief=NTHEMES.filter(t=>by[t]).map(t=>`<li><b>${esc(t)}</b> <span class="note">(${by[t].length})</span><br>${lk(by[t][0])} <span class="note">· ${esc(by[t][0].src||"")}, ${ago(by[t][0].d)}</span></li>`).join("");
+  const opts=(S.summary||[]).map(x=>`<option value="${esc(x.symbol)}">${esc(x.name||"")}</option>`).join("");
+  v.innerHTML=`<div class="grid" style="gap:var(--s4)">
+   <div><h1>${esc(r.name||sym)} <span class="mono note">${esc(sym)}</span></h1>
+    <p class="muted" style="margin:4px 0 0">Latest news headlines with links to the original sources, collected every evening from Google News. ${nw?`Last checked ${esc((nw.updated||"").replace("T"," "))} UTC.`:""}</p>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><input id="sn-pick" list="sn-list" placeholder="Another company (symbol)" aria-label="Pick company" style="max-width:240px"><datalist id="sn-list">${opts}</datalist>
+     <a class="pill" href="#company-${enc(sym)}" style="border-color:var(--line);text-decoration:none;color:var(--ink)">Company page</a></div></div>
+   <div class="card"><h2 style="margin-top:0">In brief</h2>
+    ${items.length?`<p style="margin:0 0 8px"><b>${n7}</b> stories in the last 7 days, <b>${n30}</b> in 30 days.${recent.length?" What the last two weeks were about:":" Nothing in the last two weeks."}</p>${brief?`<ul class="sn-brief">${brief}</ul>`:""}`:`<p class="muted" style="margin:0">${nw?"No headlines naming this company in the last 30 days.":"No news collected for this company yet. It fills in after the next evening update."}</p>`}
+    ${items.length?`<p style="margin:10px 0 0"><button id="sn-ai" type="button">Summarise with Claude</button> <span class="note">Uses your Ask Claude key; reads the headlines and replies with source links.</span></p>`:""}</div>
+   ${ev.length?`<div class="card"><h2 style="margin-top:0">Exchange filings</h2>${feedHtml(ev,false)}</div>`:""}
+   <div class="card"><h2 style="margin-top:0">All headlines</h2>
+    <div class="row sn-f" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">${["All",...NTHEMES.filter(t=>items.some(i=>i.theme===t))].map((t,k)=>`<button type="button" class="${k?"":"on"}" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+    <div id="sn-l"></div></div></div>`;
+  const draw=t=>{const it=items.filter(i=>t==="All"||i.theme===t);let last="";
+    $("#sn-l").innerHTML=it.length?it.map(i=>{const day=i.d.slice(0,10),hd=day!==last?`<div class="note mono" style="margin:10px 0 4px">${esc(day)}</div>`:"";last=day;
+      return hd+`<div class="sn-it">${lk(i)}<div class="note">${esc(i.src||"")} · ${esc(i.theme)} · ${ago(i.d)}</div></div>`}).join(""):"<p class='muted'>Nothing yet.</p>"};
+  draw("All");
+  v.querySelectorAll(".sn-f button").forEach(b=>b.onclick=()=>{v.querySelectorAll(".sn-f button").forEach(x=>x.classList.toggle("on",x===b));draw(b.dataset.t)});
+  $("#sn-pick").onchange=e=>{const q=e.target.value.trim().toUpperCase();const m=(S.summary||[]).find(x=>x.symbol===q)||(S.summary||[]).find(x=>(x.name||"").toUpperCase().startsWith(q));if(m&&m.symbol!==sym){e.target.onchange=null;setTimeout(()=>go("scrip-"+enc(m.symbol)),0)}};
+  const ai=$("#sn-ai");if(ai)ai.onclick=()=>{if(window.AskClaude)AskClaude.ask(`Summarise the latest news on ${r.name||sym} in a few bullets: what happened, and what might matter for the business or the share price. Cite each point with a markdown link to its source headline.`);};
+}
+
 /* ================= METHOD ================= */
 function viewMethod(){
   const c=S.meta.config||{};
@@ -1302,5 +1350,5 @@ function viewMethod(){
   }catch(e){$("#view").innerHTML='<div class="empty">Could not load data: '+esc(e.message)+'</div>'}
 })();
 </script>
-<script src="assets/ask-claude.js?v=1"></script>
+<script src="assets/ask-claude.js?v=2"></script>
 <script src="assets/notes.js?v=1"></script>

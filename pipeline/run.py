@@ -94,6 +94,11 @@ def main():
         research_step(syms, reserve_min=25 if a.mode == "weekly" else 12)
     if a.mode not in ("analyze", "research"):
         print("feeds:", fetch_feeds(uni), flush=True)
+        try:
+            from news import fetch_news
+            print("news:", fetch_news(uni), flush=True)
+        except Exception as e:
+            print("news failed:", repr(e), flush=True)
         cap = {"full": len(syms), "weekly": 200, "daily": 90}[a.mode]
         todo = stale_fundamentals(syms, max_age_days=7, cap=cap)
         print("fundamentals to refresh:", len(todo), flush=True)
