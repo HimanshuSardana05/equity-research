@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "about": "Rules for the Setups screener. The web app starts from these and lets you change them on your device; the daily build and alerts use this file. Export your on-screen rules from the Setups tab to replace it.",
+  "min_score": 60,
+  "weights": {"level": 35, "pattern": 25, "volume": 25, "trend": 15},
+  "level_full_at": 0.6,
+  "volume": {"floor": 0.7, "full": 2.0},
+  "tolerance_atr": 0.25,
+  "direction": "both",
+  "patterns": {"bull_engulf": true, "bear_engulf": true, "bull_harami": true, "bear_harami": true,
+               "piercing": true, "dark_cloud": true, "morning_star": true, "evening_star": true},
+  "kinds": {"test": true, "break": true},
+  "level_types": {"zone": true, "swing": true},
+  "alerts": {
+    "enabled": false,
+    "min_score": null,
+    "symbols": [],
+    "max_per_run": 25,
+    "channels": {
+      "email": {"enabled": false, "note": "Needs repo secrets SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, ALERT_EMAIL_TO (Gmail: an app password)."},
+      "whatsapp": {"enabled": false, "note": "Needs repo secrets WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TO (Meta WhatsApp Cloud API)."}
+    }
+  }
+}
