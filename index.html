@@ -1,0 +1,1359 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="icon" type="image/png" sizes="32x32" href="assets/logo-32.png?v=5"><link rel="icon" type="image/png" sizes="192x192" href="assets/logo-192.png?v=5"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=5"><link rel="manifest" href="manifest.webmanifest?v=5" crossorigin="use-credentials"><meta name="theme-color" content="#0b1530"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="HIS Research"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Nifty 500 Research Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: a research terminal. Sticky masthead with tabs, then one working view at a time;
+   cards only where a block is a separate instrument (chart, verdict, checklist). */
+:root{
+  --bg:#f5f7fa; --panel:#ffffff; --ink:#14202e; --muted:#5b6b7d; --line:#dfe5ec; --soft:#eef2f7;
+  --accent:#1d5fd1; --accent-ink:#ffffff;
+  --good:#127a4b; --good-bg:#e3f4ec; --up:#0f9d58; --down:#d93025; --bad:#b4372d; --bad-bg:#fbe9e7; --warn:#9a6400; --warn-bg:#fdf1db;
+  --chart-grid:#edf1f5;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
+  --accent:#6aa1ff; --accent-ink:#0b1220;
+  --good:#4cc38a; --good-bg:#12301f; --up:#2fd384; --down:#ff4d4d; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
+  --chart-grid:#1c2633; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141c; --panel:#151d28; --ink:#e4eaf2; --muted:#93a3b6; --line:#253142; --soft:#1b2533;
+  --accent:#6aa1ff; --accent-ink:#0b1220;
+  --good:#4cc38a; --good-bg:#12301f; --up:#2fd384; --down:#ff4d4d; --bad:#ff7b70; --bad-bg:#3a1714; --warn:#f0b54a; --warn-bg:#36280c;
+  --chart-grid:#1c2633; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;margin:0 auto}
+header.mast{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.mast .wrap{display:flex;align-items:center;gap:var(--s4);flex-wrap:wrap;padding-block:10px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.01em;white-space:nowrap;display:flex;align-items:center;gap:8px;color:var(--ink);text-decoration:none}
+.brand img{width:30px;height:30px;flex:none}
+.brand small{font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);margin-left:6px}
+nav.tabs{display:flex;gap:2px;flex:1 1 0;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}nav.tabs::-webkit-scrollbar{display:none}nav.tabs a{white-space:nowrap}
+nav.tabs a{padding:6px 12px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500}
+nav.tabs a:hover{background:var(--soft);color:var(--ink)}
+nav.tabs a.on{background:var(--accent);color:var(--accent-ink)}
+#selco{margin-left:auto;flex:none}#selco+.search{margin-left:8px}
+.search{margin-left:auto;position:relative;min-width:140px;flex:0 1 240px}
+.search input{width:100%}
+input,select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button{cursor:pointer}
+button:hover{background:var(--soft)}
+button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sugg{position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;margin-top:4px;max-height:320px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:20}
+.sugg div{padding:6px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.sugg div:hover,.sugg div.hl{background:var(--soft)}
+.sugg span{color:var(--muted);font-size:12px}
+main{padding-block:var(--s5)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:26px;font-weight:700}
+h2{font-size:18px;font-weight:600}
+h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono,td.n,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.grid{display:grid;gap:var(--s4)}
+.grid>*{min-width:0}
+.kpis{min-width:0}
+.g2{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.g2e{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.g2,.g2e,.g3{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:var(--s4);min-width:0}
+.card > h3{margin-bottom:var(--s3)}
+.row{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.chart{height:340px;width:100%;position:relative}
+/* lightweight-charts lays itself out with an internal <table>: keep the page table styles off it */
+.chart table{width:auto!important;font-size:inherit!important}
+.chart td,.chart th{padding:0!important;border:0!important;min-width:0!important;max-width:none!important;white-space:nowrap!important;background:none!important;position:static!important}
+.chart tr:hover{background:none!important}
+.chart.sm{height:240px}
+.zlayer{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}.ztags{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}.chart>.tv-lightweight-charts{position:relative;z-index:1}
+.sunav{position:absolute;top:6px;left:6px;z-index:5;display:flex;align-items:center;gap:4px;padding:3px;border-radius:999px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 90%,transparent);font-size:12px;max-width:calc(100% - 80px)}
+.sunav button{min-width:38px;height:34px;border-radius:999px;font-size:20px;font-weight:700;line-height:1;padding:0 8px}.sunav button:disabled{opacity:.35}
+.sunav .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;color:var(--ink)}.sunav .sym{font-family:var(--f-mono);font-weight:700;color:var(--ink)}.sunav>.t.sym{padding:6px 10px}
+.zone{position:absolute;left:0;border-block:2px solid}
+.zone span{position:absolute;left:6px;font-size:11px;font-weight:600;font-family:var(--f-mono);white-space:nowrap;color:#fff;padding:1px 6px;border-radius:4px}
+.z-res{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:var(--bad)}.z-res span{background:var(--bad)}
+.z-sup{background:color-mix(in srgb,var(--good) 18%,transparent);border-color:var(--good)}.z-sup span{background:var(--good)}
+.z-in{background:color-mix(in srgb,var(--warn) 20%,transparent);border-color:var(--warn)}.z-in span{background:var(--warn)}
+.zh{position:absolute;pointer-events:none}
+.zh.res{background:color-mix(in srgb,var(--bad) 16%,transparent);border-block:1px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+.zh.sup{background:color-mix(in srgb,var(--good) 16%,transparent);border-block:1px solid color-mix(in srgb,var(--good) 45%,transparent)}
+.zh.in{background:color-mix(in srgb,var(--warn) 18%,transparent);border-block:1px solid color-mix(in srgb,var(--warn) 50%,transparent)}
+.sw{position:absolute;height:0;border-top:2px solid;pointer-events:none;opacity:.55}.sw.b{border-top-style:dashed;opacity:.4}.sw.cur{opacity:1}.ztag{position:absolute;font:600 11px/1 var(--f-mono);color:#fff;padding:3px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 0 0 1px var(--panel)}.swt{position:absolute;left:4px;top:-9px;font:600 10px/1 var(--f-mono);color:#fff;padding:2px 5px;border-radius:4px}.sw.cur.b{opacity:.8}
+.card.fs{position:fixed;inset:0;z-index:70;margin:0;border-radius:0;overflow:hidden;display:flex;flex-direction:column;gap:6px;
+  padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+.card.fs .chart{flex:1 1 auto;min-height:120px;height:auto!important}
+.card.fs .pc-title,.card.fs #fsbtn,.card.fs #lv-list,.card.fs .rp .hint:empty{display:none}
+.card.fs .pc-head{flex-wrap:nowrap;gap:8px}.card.fs .pc-head #rng{flex-wrap:nowrap;overflow-x:auto}
+.card.fs .pc-foot{margin-top:0!important;gap:4px 8px}.card.fs .pc-foot .legend{flex-wrap:nowrap;white-space:nowrap}
+.card.fs .rp{margin-top:0;padding:4px 6px}
+.fsx{display:none}
+.card.fs .fsx{display:inline-flex;align-items:center;gap:6px;flex:none;font-weight:700;font-size:15px;padding:8px 14px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink,#fff);min-height:40px}
+.card.fs>.backbtn{display:inline-flex;align-items:center;gap:4px;margin:0 0 var(--s3);padding:8px 14px;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;font-size:14px;cursor:pointer}
+.banner{display:none}
+body.fs-on{overflow:hidden}body.fs-on .ac-fab,body.fs-on .ac-panel{display:none!important}
+.rp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding:8px;border:1px solid var(--accent);border-radius:8px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.rp button{min-width:40px;font-size:15px}.rp .dt{font-family:var(--f-mono);font-size:13px;font-weight:600;margin-left:auto}
+.rp .hint{font-size:12px;color:var(--muted);flex-basis:100%}
+.lvtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.lvtab th,.lvtab td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}
+.lvtab td.n,.lvtab th.n{text-align:right;font-family:var(--f-mono)}
+.lvtab{table-layout:auto}@media(max-width:640px){.lvtab{font-size:12px}.lvtab th,.lvtab td{padding:5px 4px}}
+.lvtab .tag{display:inline-block;min-width:26px;text-align:center;color:#fff;border-radius:4px;padding:0 5px;font:600 11px/1.6 var(--f-mono)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid transparent}
+.pill .sh{display:none}
+.p-good{background:var(--good-bg);color:var(--good)}
+.p-bad{background:var(--bad-bg);color:var(--bad)}
+.p-warn{background:var(--warn-bg);color:var(--warn)}
+.p-neutral{background:var(--soft);color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--s3)}
+.kpi{border-left:2px solid var(--line);padding-left:10px}
+.kpi b{display:block;font-family:var(--f-mono);font-size:17px;font-weight:500}
+.kpi span{font-size:12px;color:var(--muted)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--soft);font-weight:600;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+th.n,td.n{text-align:right}
+tbody tr:hover{background:var(--soft)}
+tbody tr.click{cursor:pointer}
+td .nm{font-weight:500}
+td .sy{color:var(--muted);font-size:11px;font-family:var(--f-mono)}
+.reasons{margin:0;padding-left:18px;display:grid;gap:8px}
+.check{display:flex;justify-content:space-between;gap:var(--s3);padding:6px 0;border-bottom:1px dashed var(--line)}
+.check:last-child{border-bottom:0}
+.ccgrid{display:grid;grid-template-columns:auto repeat(var(--n),minmax(38px,1fr));gap:2px;font-size:12px;overflow-x:auto}
+.ccgrid div{padding:4px;text-align:center;border-radius:4px}
+.ccgrid .lab{text-align:left;color:var(--muted)}
+.ok{background:var(--good-bg);color:var(--good)} .no{background:var(--bad-bg);color:var(--bad)} .na{background:var(--soft);color:var(--muted)}
+.bar{height:10px;border-radius:5px;background:var(--soft);position:relative;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;background:var(--accent)}
+.bar i.neg{background:var(--bad)}
+.legend{display:flex;gap:var(--s3);flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.note{font-size:12px;color:var(--muted)}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:var(--r);padding:10px 14px;font-size:13px}
+.fv{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);text-align:center}
+.fv div{background:var(--soft);border-radius:6px;padding:8px}
+.fv b{display:block;font-family:var(--f-mono);font-size:16px}
+.feed{display:grid;gap:0}
+.feed .it{padding:10px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:110px minmax(0,1fr);gap:var(--s3)}
+.feed .it a{color:var(--accent)}
+.scatter{position:relative;height:520px}
+.scatter canvas{width:100%;height:100%;display:block}
+.tip{position:absolute;pointer-events:none;max-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.15);display:none;z-index:3}
+.prose{max-width:70ch}
+.prose p,.prose li{line-height:1.65}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+footer{padding-block:var(--s5);color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:var(--s6)}
+nav.tabs{order:3;flex:1 1 100%}
+.sn-brief{margin:0;padding-left:18px}.sn-brief li{margin-bottom:8px;line-height:1.45}
+.sn-it{padding:6px 0;border-bottom:1px solid var(--line);line-height:1.4}.sn-it a{color:var(--ink);font-weight:500}.sn-it a:hover{color:var(--accent)}
+.sn-f button{border-radius:999px;font-size:12px;padding:4px 10px;cursor:pointer}.sn-f button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* ---- phones ---- */
+@media (max-width:640px){
+  .mast .wrap{gap:8px;padding-block:8px}
+  .brand{font-size:16px}
+  .brand small{display:block;margin-left:0;font-size:10px;line-height:1.2}
+  .search{order:2;flex:1 1 140px;margin-left:auto}
+  nav.tabs{order:3;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-inline:-4px}
+  nav.tabs::-webkit-scrollbar{display:none}
+  nav.tabs a{white-space:nowrap;padding:6px 10px;font-size:13px}
+  main{padding-block:16px}
+  h1{font-size:21px}
+  .card{padding:12px}
+  .chart{height:260px}.chart.sm{height:210px}
+  .scatter{height:min(70vh,420px)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpi b{font-size:15px}
+  table{font-size:12px}
+  th,td{padding:6px 6px}
+  .hs{display:none}
+  td .pill .lg{display:none} td .pill .sh{display:inline}
+  td:first-child{white-space:normal;min-width:100px;max-width:118px}
+  td .nm{line-height:1.3}
+  button{padding:5px 8px;font-size:13px}
+  .row select{flex:1 1 45%;min-width:0}
+  .feed .it{grid-template-columns:minmax(0,1fr);gap:2px}
+  .fv b{font-size:14px}
+  input,select{font-size:16px} /* stops iOS zooming into fields */
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="mast"><div class="wrap">
+  <a class="brand" href="#screen"><img src="assets/logo-64.png" alt="" width="30" height="30"><span>Nifty 500 Research Desk<small id="asof">loading…</small></span></a>
+  <nav class="tabs" id="tabs">
+    <a href="#setups" data-v="setups">Setups</a>
+    <a href="#backtest" data-v="backtest">Backtest</a>
+    <a href="#research" data-v="research">Research</a>
+    <a href="#explore" data-v="explore">Explorer</a>
+    <a href="zones.html">Zones</a>
+    <a href="#screen" data-v="screen">Screen</a>
+    <a href="#company" data-v="company">Company</a>
+    <a href="#scrip" data-v="scrip">News</a>
+    <a href="#sector" data-v="sector">Sector peers</a>
+    <a href="#factors" data-v="factors">Factor vs factor</a>
+    <a href="#news" data-v="news">Announcements</a>
+    <a href="#notes" data-v="notes">Notes</a>
+    <a href="#method" data-v="method">Method</a>
+  </nav>
+  <a id="selco" class="pill p-neutral" href="#company" hidden title="Selected company (kept across tabs)" style="text-decoration:none">Selected <b class="mono"></b></a>
+  <div class="search"><input id="q" placeholder="Search company or symbol" autocomplete="off" aria-label="Search company"><div class="sugg" id="sugg" hidden></div></div>
+</div></header>
+
+<main class="wrap" id="view"><div class="empty">Loading Nifty 500 data…</div></main>
+<footer class="wrap">Research tool for personal use. It is not investment advice. Data: NSE public archives and RSS feeds, Yahoo Finance, and your own Screener.in exports. Figures can be wrong or late; check filings before acting.</footer>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+"use strict";
+const $=(s,el=document)=>el.querySelector(s);
+const S={summary:[],sectors:{},meta:{},universe:[],cache:{},charts:[]};
+/* one selected company for every tab (and the Zones page), kept on this device */
+try{S.lastCompany=localStorage.getItem("his.sym")||null}catch(e){}
+function selectCompany(sym){if(!sym)return;S.lastCompany=sym;try{localStorage.setItem("his.sym",sym)}catch(e){}
+  const r=(S.summary||[]).find(x=>x.symbol===sym);if(r&&r.industry)S.lastSector=r.industry;const el=document.getElementById("selco");
+  if(el){el.hidden=false;el.querySelector("b").textContent=sym;el.href="#company-"+encodeURIComponent(sym)}}
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const PAL=["#2f6fe0","#d9822b","#14a37f","#c4458a","#7a5cd6","#8a9a2a","#d24c3f","#2a9bc4","#6b7d8f","#b07d2a"];
+
+/* ---------- formatting ---------- */
+const nf=(x,d=1)=>x==null||!isFinite(x)?"–":Number(x).toLocaleString("en-IN",{maximumFractionDigits:d,minimumFractionDigits:d});
+const pct=(x,d=1)=>x==null||!isFinite(x)?"–":(x*100).toFixed(d)+"%";
+const sx=(x,d=1)=>x==null||!isFinite(x)?"–":Number(x).toFixed(d)+"x";
+const cr=x=>{if(x==null||!isFinite(x))return"–";const a=Math.abs(x);if(a>=1e5)return"₹"+(x/1e5).toFixed(2)+" L cr";if(a>=1e3)return"₹"+(x/1e3).toFixed(1)+"k cr";return"₹"+x.toFixed(0)+" cr"};
+const rs=x=>x==null||!isFinite(x)?"–":"₹"+nf(x,x<100?2:0);
+const FACT={
+  pe:{l:"PE (TTM)",f:x=>sx(x)}, pb:{l:"Price / Book",f:x=>sx(x)}, ev_ebitda:{l:"EV / EBITDA",f:x=>sx(x)},
+  roce:{l:"ROCE",f:pct}, roe:{l:"ROE",f:pct}, opm:{l:"Operating margin",f:pct}, npm:{l:"Net margin",f:pct},
+  de:{l:"Debt / Equity",f:x=>sx(x,2)}, rev_cagr3:{l:"Revenue CAGR 3y",f:pct}, ni_cagr3:{l:"Profit CAGR 3y",f:pct},
+  rev_growth:{l:"Revenue growth (last FY)",f:pct}, fcf_yield:{l:"FCF yield",f:pct}, div_yield:{l:"Dividend yield",f:pct},
+  ret_1y:{l:"Return 1y",f:pct}, ret_3y:{l:"Return 3y",f:pct}, implied_growth:{l:"Price-implied growth",f:pct},
+  expected_growth:{l:"Expected growth",f:pct}, upside:{l:"Upside to DCF base",f:pct}, pe_pct:{l:"PE vs own history (pctile)",f:x=>x==null?"–":(x*100).toFixed(0)},
+  mcap:{l:"Market cap",f:cr}, ey:{l:"Earnings yield",f:pct}, asset_turnover:{l:"Asset turnover",f:x=>sx(x,2)}, leverage:{l:"Assets / Equity",f:x=>sx(x,1)},
+};
+function verdictPill(v){if(!v)return"";const c=v==="Looks cheap"?"p-good":v==="Looks expensive"?"p-bad":v==="Around fair value"?"p-neutral":"p-warn";const sh={"Looks cheap":"Cheap","Looks expensive":"Rich","Around fair value":"Fair","Insufficient data":"n/a","Loss-making / not meaningful":"Loss"}[v]||v;return`<span class="pill ${c}" title="${esc(v)}"><span class="lg">${esc(v)}</span><span class="sh">${esc(sh)}</span></span>`}
+function ccPill(s,n){const c=s==="Pass"?"p-good":s==="Pass so far"?"p-warn":s==="Fail"?"p-bad":"p-neutral";const t=s==="Pass so far"?`Coffee Can: passes ${n}y`:`Coffee Can: ${s}`;return`<span class="pill ${c}" title="Revenue growth >10% and ROCE >15% every year">${esc(t)}</span>`}
+
+/* ---------- data ---------- */
+async function getJSON(p){const r=await fetch(p);if(!r.ok)throw new Error(p+" "+r.status);return r.json()}
+async function company(sym){if(!S.cache[sym])S.cache[sym]=getJSON("data/company/"+sym.replace(/&/g,"_")+".json");return S.cache[sym]}
+const enc=s=>s.replace(/&/g,"-amp-");const dec=s=>s.replace(/-amp-/g,"&");
+
+/* ---------- charts ---------- */
+function clearCharts(){S.charts.forEach(c=>{try{c.remove()}catch(e){}});S.charts=[]}
+function mkChart(el,opts={}){
+  const c=LightweightCharts.createChart(el,{autoSize:true,
+    layout:{background:{type:"solid",color:"transparent"},textColor:css("--muted"),fontFamily:"IBM Plex Mono, monospace",fontSize:11},
+    grid:{vertLines:{color:css("--chart-grid")},horzLines:{color:css("--chart-grid")}},
+    rightPriceScale:{borderColor:css("--line")},timeScale:{borderColor:css("--line"),minBarSpacing:0.001,fixLeftEdge:true,fixRightEdge:true,lockVisibleTimeRangeOnResize:true},
+    crosshair:{mode:0},localization:{priceFormatter:opts.fmt||(p=>nf(p,p<100?2:0))},...opts.extra});
+  S.charts.push(c);return c}
+const ser=(t,v)=>{const o=[];for(let i=0;i<t.length;i++)if(v[i]!=null&&isFinite(v[i]))o.push({time:t[i],value:v[i]});return o};
+
+/* ---------- routing ---------- */
+let current="screen";
+/* Back to the list you came from, with its filters and scroll position */
+S.vs={};S.backTo=null;S.backDepth=0;S.cur=null;
+function viewSave(h){if(!h||h.startsWith("company"))return;const vals={};
+  $("#view").querySelectorAll("input[id],select[id]").forEach(e=>{if(e.closest(".card.fs"))return;vals[e.id]=e.type==="checkbox"?e.checked:e.value});
+  S.vs[h]={y:window.scrollY,vals}}
+function viewRestore(h){const st=S.vs[h];if(!st||decodeURIComponent(location.hash.slice(1)||"setups")!==h)return;
+  Object.entries(st.vals).forEach(([id,v])=>{const e=document.getElementById(id);if(!e)return;
+    if(e.type==="checkbox"){if(e.checked!==v){e.checked=v;e.dispatchEvent(new Event("change",{bubbles:true}))}}
+    else if(e.value!==v){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}))}});
+  let n=0;const sc=()=>{window.scrollTo(0,st.y);if(Math.abs(window.scrollY-st.y)>4&&n++<20)setTimeout(sc,100)};requestAnimationFrame(sc)}
+function backBtn(){if(!S.backTo||$("#backbtn"))return;const t=S.backTo,a=document.querySelector(`#tabs a[data-v="${t.split("-")[0]}"]`);
+  const b=document.createElement("button");b.id="backbtn";b.className="backbtn";b.innerHTML="‹ Back to "+esc(a?a.textContent:"list");
+  b.onclick=()=>{if(S.backDepth===1&&history.length>1)history.back();else location.hash=t};$("#view").prepend(b)}
+function route(){
+  const h=decodeURIComponent(location.hash.slice(1))||"setups";
+  const prev=S.cur;if(prev&&prev!==h)viewSave(prev);S.cur=h;
+  if(h.startsWith("company")){if(prev&&!prev.startsWith("company")){S.backTo=prev;S.backDepth=1}else if(prev!==h&&!S.navReplace)S.backDepth++}
+  else S.backTo=null;
+  S.navReplace=false;
+  const done=routeView(h);Promise.resolve(done).then(()=>{if(h.startsWith("company"))backBtn();else viewRestore(h)});
+}
+function routeView(h){
+  document.querySelectorAll("#tabs a").forEach(a=>a.classList.toggle("on",h===a.dataset.v||h.startsWith(a.dataset.v+"-")));
+  clearCharts();
+  if(h.startsWith("company-"))return viewCompany(dec(h.slice(8)));
+  if(h==="company")return viewCompany(S.lastCompany||(S.summary.slice().sort((a,b)=>(b.mcap||0)-(a.mcap||0))[0]||{}).symbol);
+  if(h.startsWith("sector-"))return viewSector(S.sectorKeys[+h.slice(7)]);
+  if(h==="sector"){if(!S.lastSector&&S.lastCompany){const r=S.summary.find(x=>x.symbol===S.lastCompany);if(r)S.lastSector=r.industry}return viewSector(S.lastSector)}
+  if(h==="factors")return viewFactors();
+  if(h==="setups")return viewSetups();
+  if(h==="backtest")return viewBacktest();
+  if(h==="research")return viewResearch();
+  if(h==="explore")return viewExplore();
+  if(h==="news")return viewNews();
+  if(h.startsWith("scrip-"))return viewScrip(dec(h.slice(6)));
+  if(h==="scrip")return viewScrip(S.lastCompany||(S.summary.slice().sort((a,b)=>(b.mcap||0)-(a.mcap||0))[0]||{}).symbol);
+  if(h==="method")return viewMethod();
+  if(h==="notes")return window.HisNotes?HisNotes.renderList($("#view")):($("#view").innerHTML='<div class="empty">Notes did not load.</div>');
+  return viewScreen();
+}
+window.addEventListener("hashchange",route);
+const go=h=>{if(location.hash==="#"+h)route();else location.hash=h};
+const goCompany=s=>go("company-"+enc(s));
+
+/* ---------- search ---------- */
+function setupSearch(){
+  const q=$("#q"),box=$("#sugg");let hits=[],hl=0;
+  const draw=()=>{box.innerHTML=hits.map((h,i)=>`<div class="${i===hl?"hl":""}" data-s="${esc(h.symbol)}">${esc(h.name)}<span>${esc(h.symbol)}</span></div>`).join("");box.hidden=!hits.length};
+  q.addEventListener("input",()=>{const t=q.value.trim().toLowerCase();hl=0;
+    hits=t?S.summary.filter(r=>r.symbol.toLowerCase().includes(t)||r.name.toLowerCase().includes(t)).sort((a,b)=>(a.symbol.toLowerCase().startsWith(t)?0:1)-(b.symbol.toLowerCase().startsWith(t)?0:1)||(b.mcap||0)-(a.mcap||0)).slice(0,10):[];draw()});
+  q.addEventListener("keydown",e=>{if(e.key==="ArrowDown"){hl=Math.min(hl+1,hits.length-1);draw();e.preventDefault()}else if(e.key==="ArrowUp"){hl=Math.max(hl-1,0);draw();e.preventDefault()}else if(e.key==="Enter"&&hits[hl]){goCompany(hits[hl].symbol);q.value="";hits=[];draw()}else if(e.key==="Escape"){hits=[];draw()}});
+  box.addEventListener("mousedown",e=>{const d=e.target.closest("[data-s]");if(d){goCompany(d.dataset.s);q.value="";hits=[];draw()}});
+  q.addEventListener("blur",()=>setTimeout(()=>{box.hidden=true},150));
+}
+
+/* ---------- sortable table helper ---------- */
+function table(el,cols,rows,{sort="mcap",dir=-1,onRow}={}){
+  let sk=sort,sd=dir;
+  const render=()=>{
+    const r=rows.slice().sort((a,b)=>{const x=a[sk],y=b[sk];if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return-1;return(typeof x==="string"?x.localeCompare(y):x-y)*sd});
+    el.innerHTML=`<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th class="${c.n?"n":""} ${c.h?"hs":""}" data-k="${c.k}">${esc(c.l)}${c.k===sk?(sd>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead><tbody>${
+      r.map(x=>`<tr class="${onRow?"click":""}" data-s="${esc(x.symbol)}">${cols.map(c=>`<td class="${c.n?"n":""} ${c.h?"hs":""}">${c.r?c.r(x):esc(x[c.k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    el.querySelectorAll("th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd=-sd;else{sk=k;sd=-1}render()});
+    if(onRow)el.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=()=>onRow(tr.dataset.s));
+  };render();
+}
+const nameCell=x=>`<div class="nm">${esc(x.name)}</div><div class="sy">${esc(x.symbol)}</div>`;
+
+/* ================= SCREEN ================= */
+function viewScreen(){
+  const v=$("#view");
+  const inds=[...new Set(S.summary.map(r=>r.industry))].sort();
+  const counts={cc:S.summary.filter(r=>r.coffee_can==="Pass"||r.coffee_can==="Pass so far").length,
+    cheap:S.summary.filter(r=>r.verdict==="Looks cheap").length,exp:S.summary.filter(r=>r.verdict==="Looks expensive").length};
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s5)">
+   <div class="row between"><div><h1>Screen the Nifty 500</h1><p class="muted" style="margin:4px 0 0">Coffee Can filters first, then valuation. Click a row to open the company.</p></div>
+    <div class="kpis" style="flex:1;max-width:560px">
+     <div class="kpi"><b>${S.summary.length}</b><span>companies covered</span></div>
+     <div class="kpi"><b>${counts.cc}</b><span>pass Coffee Can on available years</span></div>
+     <div class="kpi"><b style="color:var(--good)">${counts.cheap}</b><span>look cheap</span></div>
+     <div class="kpi"><b style="color:var(--bad)">${counts.exp}</b><span>look expensive</span></div>
+    </div></div>
+   <div class="row">
+    <select id="f-ind" aria-label="Sector"><option value="">All sectors</option>${inds.map(i=>`<option>${esc(i)}</option>`).join("")}</select>
+    <select id="f-cc" aria-label="Coffee Can"><option value="">Any Coffee Can result</option><option value="pass">Passes (all years available)</option><option value="Pass">Passes full 10 years</option><option value="Fail">Fails</option></select>
+    <select id="f-v" aria-label="Verdict"><option value="">Any valuation</option><option>Looks cheap</option><option>Around fair value</option><option>Looks expensive</option></select>
+    <select id="f-b" aria-label="Buffett checks"><option value="0">Any Buffett score</option><option value="4">4+ quality checks</option><option value="5">5+ quality checks</option></select>
+    <span class="note" id="f-n"></span>
+   </div>
+   <div id="screen-t"></div>
+  </div>`;
+  const cols=[
+    {k:"name",l:"Company",r:nameCell},{k:"industry",l:"Sector",h:1,r:x=>`<span class="muted">${esc(x.industry)}</span>`},
+    {k:"mcap",l:"Mkt cap",n:1,h:1,r:x=>cr(x.mcap)},{k:"pe",l:"PE",n:1,r:x=>sx(x.pe)},
+    {k:"pe_pct",l:"PE pctile (own)",n:1,h:1,r:x=>x.pe_pct==null?"–":(x.pe_pct*100).toFixed(0)},
+    {k:"roce",l:"ROCE / ROE",n:1,r:x=>pct(x.financial?x.roe:x.roce)},
+    {k:"rev_cagr3",l:"Rev CAGR 3y",n:1,h:1,r:x=>pct(x.rev_cagr3)},
+    {k:"implied_growth",l:"Implied g",n:1,h:1,r:x=>pct(x.implied_growth,0)},
+    {k:"expected_growth",l:"Expected g",n:1,h:1,r:x=>pct(x.expected_growth,0)},
+    {k:"upside",l:"Upside",n:1,r:x=>x.upside==null?"–":`<span style="color:${x.upside>0?"var(--good)":"var(--bad)"}">${pct(x.upside,0)}</span>`},
+    {k:"cc_years",l:"Coffee Can",h:1,r:x=>ccPill(x.coffee_can,x.cc_years)},
+    {k:"buffett_score",l:"Buffett",n:1,h:1,r:x=>`${x.buffett_score}/${x.buffett_total}`},
+    {k:"score",l:"Valuation",r:x=>verdictPill(x.verdict)},
+  ];
+  const apply=()=>{
+    const i=$("#f-ind").value,c=$("#f-cc").value,vv=$("#f-v").value,b=+$("#f-b").value;
+    const rows=S.summary.filter(r=>(!i||r.industry===i)&&(!c||(c==="pass"?(r.coffee_can==="Pass"||r.coffee_can==="Pass so far"):r.coffee_can===c))&&(!vv||r.verdict===vv)&&r.buffett_score>=b);
+    $("#f-n").textContent=rows.length+" shown";
+    table($("#screen-t"),cols,rows,{onRow:goCompany});
+  };
+  ["f-ind","f-cc","f-v","f-b"].forEach(id=>$("#"+id).onchange=apply);apply();
+}
+
+/* ================= COMPANY ================= */
+async function viewCompany(sym){
+  const v=$("#view");if(!sym){v.innerHTML='<div class="empty">Search for a company above.</div>';return}
+  selectCompany(sym);v.innerHTML='<div class="empty">Loading '+esc(sym)+'…</div>';
+  let c;try{c=await company(sym)}catch(e){v.innerHTML='<div class="empty">No data for '+esc(sym)+' yet.</div>';return}
+  const m=c.metrics,sec=S.sectors[c.industry]||{},d=c.dcf||{},cc=c.coffee_can,vd=c.verdict||{};
+  const q=c.financial?"ROE":"ROCE";
+  const yrs=c.annual.length, src=Object.values(c.sources||{});
+  const scr=src.filter(s=>s==="screener").length;
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s4)">
+   <div class="row between" style="align-items:flex-end">
+    <div><div class="row" style="gap:10px"><h1>${esc(c.name)}</h1><span class="mono muted">${esc(c.symbol)}</span></div>
+     <div class="row" style="margin-top:6px"><a href="#sector-${S.sectorKeys.indexOf(c.industry)}" class="pill p-neutral" style="text-decoration:none">${esc(c.industry)}</a>${verdictPill(vd.label)}${ccPill(cc.status,cc.years_checked)}<span class="pill p-neutral">Buffett ${c.buffett.filter(b=>b.pass).length}/${c.buffett.length}</span></div></div>
+    <div class="kpis" style="flex:1;max-width:760px">
+     <div class="kpi"><b>${rs(m.price)}</b><span>close ${esc(m.price_date||"")}</span></div>
+     <div class="kpi"><b>${cr(m.mcap)}</b><span>market cap</span></div>
+     <div class="kpi"><b>${sx(m.pe)}</b><span>PE · sector ${sx(sec.median_pe)}</span></div>
+     <div class="kpi"><b>${pct(c.financial?m.roe:m.roce)}</b><span>${q} · sector ${pct(c.financial?sec.median_roe:sec.median_roce)}</span></div>
+     <div class="kpi"><b style="color:${(m.ret_1y||0)>=0?"var(--good)":"var(--bad)"}">${pct(m.ret_1y)}</b><span>1y return</span></div>
+    </div>
+   </div>
+   ${yrs<10?`<div class="banner">${yrs} years of fundamentals available${scr?` (${scr} from your Screener export)`:""}. The 10-year Coffee Can test and long valuation history need more years: export this company from Screener.in and drop the file in <span class="mono">data/screener_exports/</span>.</div>`:""}
+   <div class="grid g2">
+    <div class="card"><div class="row between pc-head"><button class="fsx" id="fsx" aria-label="Exit full screen">✕ Exit</button><h3 class="pc-title">Price · support &amp; resistance</h3><div class="row" id="rng">${["Auto","6M","1Y","3Y","5Y","10Y","Max"].map(r=>`<button data-r="${r}" class="${r==="5Y"?"on":""}" title="${r==="Auto"?"The candles that matter: the levels in play and the recent move":r}">${r}</button>`).join("")}<button id="rpbtn" title="Bar replay" aria-label="Bar replay">⏯</button><button id="fsbtn" title="Full screen" aria-label="Full screen chart">⤢</button></div></div><div class="chart" id="ch-price"><div class="zlayer" id="zlayer"></div><div class="ztags" id="ztags"></div></div>
+     <div class="rp" id="rp" hidden><button id="rp-back" title="Back one bar" aria-label="Back one bar">◀︎</button><button id="rp-play" title="Play" aria-label="Play">▶︎</button><button id="rp-fwd" title="Forward one bar" aria-label="Forward one bar">▶︎|</button>
+      <select id="rp-speed" aria-label="Replay speed"><option value="1000">1 bar/s</option><option value="500" selected>2 bars/s</option><option value="200">5 bars/s</option><option value="100">10 bars/s</option></select>
+      <button id="rp-pick" title="Choose a new start">Start…</button><button id="rp-exit">Exit</button><span class="dt" id="rp-dt"></span><span class="hint" id="rp-hint"></span></div>
+     <div class="row between pc-foot" style="margin-top:8px"><div class="legend" id="lg-lv"></div>
+      <select id="lvset" aria-label="Support and resistance settings"><option value="daily">Levels: daily-tuned</option><option value="given">Levels: your settings</option><option value="off">Levels: off</option></select><label class="row" style="gap:4px"><input type="checkbox" id="lvhist"> history</label></div><div id="lv-list"></div></div>
+    <div class="card"><h3>Why it looks ${esc((vd.label||"").replace("Looks ","").toLowerCase()||"this way")}</h3>
+     ${vd.signals?`<p class="note" style="margin-top:0">Based on ${vd.signals} of 3 signals (reverse DCF, own history, peer-justified PE)${vd.signals<3?". Fewer signals means lower confidence":""}.</p>`:""}${(vd.parts||[]).length?`<div style="margin:0 0 12px">${vd.parts.map(p=>{const v=Math.max(-1,Math.min(1,p.s/2));return`<div style="margin:6px 0"><div class="row between"><span>${esc(p.name)} <span class="note">· ${(p.share*100).toFixed(0)}% weight</span></span><span class="note">${esc(p.detail)}</span></div><div class="bar" title="left = cheap, right = expensive"><i class="${v<0?"":"neg"}" style="left:${v<0?50+v*50:50}%;width:${Math.abs(v)*50}%"></i><i style="left:50%;width:1px;background:var(--muted)"></i></div></div>`}).join("")}<div class="row between note"><span>← cheap</span><span>expensive →</span></div></div>`:""}<ul class="reasons">${(vd.reasons||[]).map(r=>`<li>${esc(r)}</li>`).join("")||"<li class='muted'>No strong signal either way.</li>"}</ul>
+     ${d.fair_value?`<div style="margin-top:var(--s4)"><h3 style="margin-bottom:8px">DCF value per share (FCFE, Damodaran-style)</h3>
+      <div class="fv"><div><span class="note">Bear (g ${pct(d.expected_growth-0.04,0)})</span><b>${rs(d.fair_value.bear)}</b></div><div><span class="note">Base (g ${pct(d.expected_growth,0)})</span><b>${rs(d.fair_value.base)}</b></div><div><span class="note">Bull (g ${pct(d.expected_growth+0.04,0)})</span><b>${rs(d.fair_value.bull)}</b></div></div>
+      <p class="note" style="margin:8px 0 0">Price ${rs(m.price)} implies ${pct(d.implied_growth,1)} a year profit growth for ${d.years} years at ${pct(d.cost_of_equity,1)} cost of equity and ${pct(d.roe_used,0)} ROE. Expected growth is the median of: ${(d.growth_inputs||[]).map(g=>esc(g[0])+" "+pct(g[1],0)).join(", ")}.</p></div>`:""}
+     ${c.peer&&c.peer.justified_pe?`<p class="note" style="margin-top:8px">Peer-justified PE given its ${q} and growth: <b class="mono">${sx(c.peer.justified_pe)}</b> vs actual ${sx(m.pe)}.</p>`:""}
+    </div>
+   </div>
+   <div class="grid g2e">
+    <div class="card"><div class="row between"><h3>Valuation history</h3><div class="row" id="vm">${[["pe","PE"],["pb","P/B"],["ev_ebitda","EV/EBITDA"],["ps","P/S"]].map(([k,l],i)=>`<button data-k="${k}" class="${i===(c.financial?1:0)?"on":""}">${l}</button>`).join("")}</div></div>
+     <div class="chart sm" id="ch-val"></div><div class="legend" id="lg-val"></div></div>
+    <div class="card"><div class="row between"><h3>Fundamentals by year</h3><select id="fm" aria-label="Fundamental metric">${[["revenue","Revenue"],["net_income","Net profit"],["ebitda","EBITDA"],["fcf","Free cash flow"],["roce","ROCE"],["roe","ROE"],["opm","Operating margin"],["npm","Net margin"],["de","Debt / Equity"],["eps","EPS"]].filter(([k])=>c.annual.some(a=>a[k]!=null)).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></div>
+     <div class="chart sm" id="ch-fund"></div><div class="legend"><span><i style="background:${PAL[0]}"></i>${esc(c.symbol)}</span><span class="note">Bars are fiscal years. Dashed line is the sector median today.</span></div></div>
+   </div>
+   <div class="grid g3">
+    <div class="card"><h3>Coffee Can test</h3>${coffeeGrid(cc)}<p class="note">Saurabh Mukherjea's rule: revenue growth above 10% and ${cc.metric} above 15% in every one of the last 10 years. ${esc(cc.note||"")}</p></div>
+    <div class="card"><h3>Buffett-style quality</h3>${c.buffett.map(b=>`<div class="check"><span>${esc(b.name)}<br><span class="note">${esc(b.value)}</span></span><span class="pill ${b.pass?"p-good":"p-bad"}">${b.pass?"Yes":"No"}</span></div>`).join("")||"<p class='muted'>Not enough data.</p>"}</div>
+    <div class="card"><h3>Where the return came from</h3>${decomp(c.decomposition)}</div>
+   </div>
+   <div class="grid g2e">
+    <div class="card"><h3>What this company does differently from its sector</h3>${peerDiff(c)}</div>
+    <div class="card"><h3>Results expectations</h3>${estimates(c)}</div>
+   </div>
+   <div class="card"><h3>Annual figures (₹ crore)</h3><div id="annual-t"></div><p class="note">Source per year: ${Object.entries(c.sources||{}).map(([y,s])=>y+" "+s).join(" · ")}</p></div>
+   <div class="grid g2e">
+    <div class="card"><h3>Announcements</h3>${feedHtml(c.events.slice(0,15),false)||"<p class='muted'>No announcements collected yet. The daily run keeps adding them.</p>"}</div>
+    <div class="card"><h3>About</h3><p class="prose" style="margin:0">${esc(c.about||"")}</p>${c.website?`<p><a href="${esc(c.website)}" target="_blank" rel="noopener">${esc(c.website)}</a></p>`:""}</div>
+   </div>
+  </div>`;
+
+  // price chart
+  const pc=mkChart($("#ch-price"));pc.timeScale().applyOptions({fixRightEdge:false,rightOffset:4});
+  const P=c.price,hasOHLC=P.o&&P.o.some(x=>x!=null);let pl,DATA=[];const RP={on:false,idx:null,picking:false,timer:null};
+  if(hasOHLC){
+    pl=pc.addCandlestickSeries({upColor:css("--up"),downColor:css("--down"),borderVisible:true,borderUpColor:css("--up"),borderDownColor:css("--down"),wickUpColor:css("--up"),wickDownColor:css("--down")});
+    const d=[];for(let i=0;i<P.t.length;i++){const o=P.o[i],h=P.h[i],l=P.l[i],cl=P.c[i];if(cl==null)continue;
+      d.push(o!=null&&h!=null&&l!=null?{time:P.t[i],open:o,high:Math.max(h,o,cl),low:Math.min(l,o,cl),close:cl}:{time:P.t[i],open:cl,high:cl,low:cl,close:cl})}
+    pl.setData(d);DATA=d;
+  }else{pl=pc.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2});DATA=ser(P.t,P.c);pl.setData(DATA)}
+  // support / resistance from the LevelIndicator (computed nightly in the pipeline)
+  let plines=[];const IDX={};{let k=0;for(let i=0;i<P.t.length;i++)if(P.c[i]!=null)IDX[P.t[i]]=k++}
+  const zl=$("#zlayer"),LV=c.levels||{},CH={};
+  // link day-to-day pieces of the same level (same side, overlapping, on consecutive candles) so each level
+  // can be drawn only from the day it appeared to the day it was dropped or broken
+  const chains=set=>{if(CH[set])return CH[set];const H=(LV[set]||{}).history||{zones:[],swings:[]};
+    const zs=(H.zones||[]).slice().sort((a,b)=>a.from<b.from?-1:1),open=[];
+    zs.forEach(z=>{const i=IDX[z.from];const p=open.find(o=>o.side===z.side&&IDX[o.to]+1===i&&o.lo<=z.hi&&o.hi>=z.lo&&!o.next);if(p){p.next=z;z.start=p.start}else z.start=z.from;open.push(z)});
+    const ws=(H.swings||[]).slice().sort((a,b)=>a.from<b.from?-1:1),ow=[];
+    ws.forEach(w=>{const i=IDX[w.from];const p=ow.find(o=>o.side===w.side&&o.p===w.p&&IDX[o.to]+1===i&&!o.next);if(p){p.next=w;w.start=p.start}else w.start=w.from;ow.push(w)});
+    return CH[set]={zones:zs,swings:ws}};
+  const drawLevels=()=>{if(!zl.isConnected)return;
+    const set=$("#lvset").value;plines.forEach(x=>pl.removePriceLine(x));plines=[];zl.innerHTML="";$("#ztags").innerHTML="";
+    if(set==="off"){$("#lg-lv").innerHTML="";return}
+    const L0=LV[set]||{zones:[],swings:[]};
+    const replay=RP.on&&RP.idx!=null&&RP.idx<DATA.length-1,asOf=replay?DATA[RP.idx].time:LV.as_of;
+    const H=chains(set),act=x=>x.from<=asOf&&x.to>=asOf;
+    const zStart=z=>{const m=(H.zones||[]).find(h=>act(h)&&h.side===(z.side==="above"?1:z.side==="below"?-1:0)&&h.lo<=z.high&&h.hi>=z.low);return m?m.start:(z.since||z.firstPivotTime)};
+    const wStart=w=>{const m=(H.swings||[]).find(h=>act(h)&&h.p===w.price&&h.side===(w.side==="high"?1:-1));return m?m.start:(w.since||w.pivotTime)};
+    const L=replay?{history:H,
+      zones:(H.zones||[]).filter(act).map(z=>({low:z.lo,high:z.hi,mid:(z.lo+z.hi)/2,touches:z.n,score:+(1-Math.exp(-z.n/7.163)).toFixed(2),side:z.side>0?"above":z.side<0?"below":"inside",firstPivotTime:z.from,lastPivotTime:"",since:z.from})),
+      swings:(H.swings||[]).filter(act).map(w=>({price:w.p,side:w.side>0?"high":"low",broken:w.b,pivotTime:"",holdBars:null,since:w.from}))}:L0;
+    const last=replay?DATA[RP.idx].close:P.c[P.c.length-1];const dist=p=>last?((p/last-1)*100):null;
+    const zs=(L.zones||[]).map(z=>({...z,kind:z.side==="above"?"res":z.side==="below"?"sup":"in"}));
+    let nr=0,ns=0;zs.slice().sort((a,b)=>Math.abs(a.mid-last)-Math.abs(b.mid-last)).forEach(z=>{z.tag=z.kind==="res"?"R"+(++nr):z.kind==="sup"?"S"+(++ns):"Z"});
+    (L.swings||[]).forEach(w=>plines.push(pl.createPriceLine({price:w.price,color:w.side==="high"?css("--bad"):css("--good"),lineWidth:2,lineStyle:w.broken?2:0,lineVisible:false,axisLabelVisible:true,title:""})));
+    zs.forEach(z=>plines.push(pl.createPriceLine({price:z.mid,color:z.kind==="res"?css("--bad"):z.kind==="sup"?css("--good"):css("--warn"),lineWidth:1,lineStyle:3,lineVisible:false,axisLabelVisible:true,title:""})));
+    const W=pc.priceScale("right").width(),tags=[];
+    zs.forEach(z=>{const y1=pl.priceToCoordinate(z.high),y2=pl.priceToCoordinate(z.low);if(y1==null||y2==null)return;
+      const top=Math.min(y1,y2),h=Math.max(4,Math.abs(y2-y1));
+      const el=document.createElement("div");el.className="zone z-"+z.kind;el.style.top=top+"px";el.style.height=h+"px";el.style.right=W+"px";let x0=0;{const i0=IDX[zStart(z)];const x=i0==null?null:pc.timeScale().logicalToCoordinate(i0);if(x!=null&&x>0)x0=x}el.style.left=x0+"px";
+      // tag sits at the zone's left end; for a level that only just appeared, it goes just left of the zone so it does not cover the latest candles
+      const Wd=$("#ch-price").clientWidth-W;tags.push({t:z.tag,col:z.kind==="res"?"--bad":z.kind==="sup"?"--good":"--warn",x:x0,y:top+h/2,out:x0>Wd-70,k:0});zl.appendChild(el)});
+    {const ts=pc.timeScale(),Wd=$("#ch-price").clientWidth-W;(L.swings||[]).forEach(w=>{const y=pl.priceToCoordinate(w.price);if(y==null)return;const i0=IDX[wStart(w)];
+      let l=i0==null?0:ts.logicalToCoordinate(i0);if(l==null||l<0)l=0;if(l>=Wd)return;const el=document.createElement("div");el.className="sw cur"+(w.broken?" b":"");
+      el.style.cssText=`left:${l}px;width:${Wd-l}px;top:${y-1}px;border-color:var(${w.side==="high"?"--bad":"--good"})`;
+      tags.push({t:w.side==="high"?"SH":"SL",col:w.side==="high"?"--bad":"--good",x:l,y,out:l>Wd-70,k:1});zl.appendChild(el)})}
+    {const placed=[],hit=(x,y,w)=>placed.some(p=>x<p.x+p.w+3&&x+w+3>p.x&&Math.abs(y-p.y)<17);
+      tags.sort((a,b)=>b.x-a.x||a.k-b.k).forEach(g=>{const w=g.t.length*7+12;let x=g.out?g.x-6-w:g.x+6,y=g.y-9;let n=0;
+        while(hit(x,y,w)&&n++<40)x=g.out||x>w*2?x-(w+4):x+(w+4);if(x<0)x=2;placed.push({x,y,w});
+        const sp=document.createElement("span");sp.className="ztag";sp.textContent=g.t;sp.style.cssText=`left:${x}px;top:${y}px;background:var(${g.col})`;$("#ztags").appendChild(sp)})}
+    if($("#lvhist").checked&&H){
+      const ts=pc.timeScale(),bs=Math.max(1,(ts.logicalToCoordinate(1)??1)-(ts.logicalToCoordinate(0)??0)),Wd=$("#ch-price").clientWidth-W;
+      const X=t=>{const i=IDX[t];return i==null?null:ts.logicalToCoordinate(i)};const frag=document.createDocumentFragment();
+      (H.zones||[]).forEach(z=>{if(z.from>asOf||act(z))return;const x1=X(z.from),x2=X(z.to<asOf?z.to:asOf);if(x1==null||x2==null||x2<-bs||x1>Wd)return;
+        const y1=pl.priceToCoordinate(z.hi),y2=pl.priceToCoordinate(z.lo);if(y1==null||y2==null)return;
+        const el=document.createElement("div");el.className="zh "+(z.side>0?"res":z.side<0?"sup":"in");const l=Math.max(0,x1-bs/2),r=Math.min(Wd,x2+bs/2);
+        el.style.cssText=`left:${l}px;width:${Math.max(2,r-l)}px;top:${Math.min(y1,y2)}px;height:${Math.max(2,Math.abs(y2-y1))}px`;frag.appendChild(el)});
+      (H.swings||[]).forEach(w=>{if(w.from>asOf||act(w))return;const x1=X(w.from),x2=X(w.to<asOf?w.to:asOf);if(x1==null||x2==null||x2<-bs||x1>Wd)return;const y=pl.priceToCoordinate(w.p);if(y==null)return;
+        const el=document.createElement("div");el.className="sw"+(w.b?" b":"");const l=Math.max(0,x1-bs/2),r=Math.min(Wd,x2+bs/2);
+        el.style.cssText=`left:${l}px;width:${Math.max(2,r-l)}px;top:${y-1}px;border-color:var(${w.side>0?"--bad":"--good"})`;frag.appendChild(el)});
+      zl.insertBefore(frag,zl.firstChild)}
+    const nz=zs.length,nw=(L.swings||[]).length;
+    $("#lg-lv").innerHTML=nz||nw?`<span><i style="background:var(--bad)"></i>resistance</span><span><i style="background:var(--good)"></i>support</span><span>as of ${esc(asOf||"")}${replay?" (replay)":""}</span>`
+      :`<span>No zones or swing levels in play with ${set==="given"?"your settings (built for 5-minute candles)":"these settings"}.</span>`;
+    const rows=[...zs.map(z=>({tag:z.tag,col:z.kind==="res"?"--bad":z.kind==="sup"?"--good":"--warn",what:(z.kind==="res"?"Resistance":z.kind==="sup"?"Support":"Price in zone"),lvl:`${nf(z.low,z.low<100?2:0)}–${nf(z.high,z.high<100?2:0)}`,d:dist(z.mid),info:`${z.touches} touches · score ${z.score}`+(z.lastPivotTime?` · last ${esc(z.lastPivotTime)}`:` · shown since ${esc(z.since||"")}`)})),
+      ...(L.swings||[]).map(w=>({tag:w.side==="high"?"SH":"SL",col:w.side==="high"?"--bad":"--good",what:(w.side==="high"?"Swing high":"Swing low")+(w.broken?" (broken)":""),lvl:nf(w.price,w.price<100?2:0),d:dist(w.price),info:w.holdBars==null?`shown since ${esc(w.since||"")}`:`${esc(w.pivotTime||"")} · held ${w.holdBars} days`}))].sort((a,b)=>(b.d??0)-(a.d??0));
+    $("#lv-list").innerHTML=rows.length?`<div class="tablewrap"><table class="lvtab"><thead><tr><th></th><th class="hs">Level</th><th class="n">₹</th><th class="n">vs close</th><th class="hs">Detail</th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="tag" style="background:var(${r.col})">${r.tag}</span></td><td class="hs">${r.what}</td><td class="n">${r.lvl}</td><td class="n">${r.d==null?"–":(r.d>0?"+":"")+r.d.toFixed(1)+"%"}</td><td class="note hs">${r.info}</td></tr>`).join("")}</tbody></table></div><p class="note" style="margin:6px 0 0">${replay&&!(H.zones||[]).length&&!(H.swings||[]).length?"No level history for this stock yet. ":""}Bright bands and tags are ${replay?"the levels on "+esc(asOf):"today’s levels"}. Each level is drawn only from the day it appeared; faint bands and lines are earlier levels, shown only for the days they were in effect (using only the candles up to each day). Zones appear only when price is within ${set==="given"?"1":"3"} daily ATR of them. Close ₹${nf(last,last<100?2:0)}.</p>`:"";
+  };
+  const redraw=()=>requestAnimationFrame(()=>requestAnimationFrame(drawLevels));
+  {let key="";const ref=P.c.find(x=>x!=null)||1;const watch=()=>{if(!zl.isConnected)return;
+    const k=[pl.priceToCoordinate(ref),pl.priceToCoordinate(ref*1.1),pc.timeScale().logicalToCoordinate(0),$("#ch-price").clientHeight].map(x=>x==null?"":x.toFixed(1)).join();
+    if(k!==key){const first=!key;key=k;if(!first)drawLevels()}requestAnimationFrame(watch)};requestAnimationFrame(watch)}
+  pc.timeScale().subscribeVisibleLogicalRangeChange(redraw);
+  try{new ResizeObserver(redraw).observe($("#ch-price"))}catch(e){}
+  $("#lvset").onchange=redraw;$("#lvhist").onchange=redraw;
+  const ts=pc.timeScale(),rpEl=$("#rp");
+  const rpLabel=()=>{const b=DATA[RP.idx];$("#rp-dt").textContent=b?`${b.time} · ₹${nf(b.close,b.close<100?2:0)}`:"";};
+  const rpStop=()=>{clearInterval(RP.timer);RP.timer=null;$("#rp-play").textContent="▶︎";$("#rp-play").title="Play"};
+  const rpSet=i=>{i=Math.max(20,Math.min(DATA.length-1,i));const lr=ts.getVisibleLogicalRange();const w=lr?Math.max(30,lr.to-lr.from):120;
+    RP.idx=i;pl.setData(DATA.slice(0,i+1));setMk(DATA[i].time);ts.setVisibleLogicalRange({from:i-w*0.85,to:i+w*0.15});rpLabel();
+    $("#rp-hint").textContent=i>=DATA.length-1?"Reached the latest candle.":"";if(i>=DATA.length-1)rpStop();redraw()};
+  const rpPick=()=>{rpStop();RP.picking=true;$("#rp-hint").textContent="Tap the chart where the replay should start.";pl.setData(DATA);setMk();RP.idx=null;$("#rp-dt").textContent="";redraw()};
+  const rpOn=on=>{RP.on=on;$("#rp").hidden=!on;$("#rpbtn").classList.toggle("on",on);if(on)rpPick();else{rpStop();RP.picking=false;RP.idx=null;pl.setData(DATA);setMk();const b=$("#rng button.on");if(b)setR(b.dataset.r);redraw()}};
+  pc.subscribeClick(p=>{if(!RP.on||!RP.picking||p.logical==null)return;RP.picking=false;rpSet(Math.round(p.logical))});
+  $("#rpbtn").onclick=()=>rpOn(!RP.on);$("#rp-exit").onclick=()=>rpOn(false);$("#rp-pick").onclick=rpPick;
+  const rpStart=()=>{if(RP.idx==null){RP.picking=false;rpSet(DATA.length-120)}};
+  $("#rp-back").onclick=()=>{rpStop();rpStart();rpSet(RP.idx-1)};$("#rp-fwd").onclick=()=>{rpStop();rpStart();rpSet(RP.idx+1)};
+  const rpRun=()=>{clearInterval(RP.timer);RP.timer=setInterval(()=>{if(!rpEl.isConnected){clearInterval(RP.timer);return}rpSet(RP.idx+1)},+$("#rp-speed").value)};
+  $("#rp-play").onclick=()=>{if(RP.timer){rpStop();return}rpStart();if(RP.idx>=DATA.length-1)return;$("#rp-play").textContent="⏸";$("#rp-play").title="Pause";rpRun()};
+  $("#rp-speed").onchange=()=>{if(RP.timer)rpRun()};
+  const SU0=(c.setups||[]).slice().sort((a,b)=>a.date<b.date?-1:1);let SU=SU0;
+  const setMk=upto=>{try{pl.setMarkers(SU.filter(x=>!upto||x.date<=upto).map(x=>({time:x.date,position:x.dir>0?"belowBar":"aboveBar",color:x.dir>0?css("--good"):css("--bad"),shape:x.dir>0?"arrowUp":"arrowDown",text:innerWidth<700?"":PATSHORT[x.pattern]+(x.kind==="break"?" ↗":"")})))}catch(e){}};
+  setMk();
+  suRules().then(R=>{if(!zl.isConnected)return;SU=SU0.filter(x=>x.zs==null||suPass(x,R));if(RP.idx==null)setMk();else setMk(DATA[RP.idx].time)});
+  const fsCard=$("#ch-price").closest(".card");
+  const fsSet=on=>{fsCard.classList.toggle("fs",on);document.body.classList.toggle("fs-on",on);redraw()};
+  const fsOpen=()=>fsCard.classList.contains("fs");let nativeFs=false;
+  const fsEnter=async()=>{if(fsOpen())return;fsSet(true);try{history.pushState({fs:1},"")}catch(e){}
+    try{if(fsCard.requestFullscreen){await fsCard.requestFullscreen();nativeFs=true;await screen.orientation?.lock?.("landscape")}}catch(e){}};
+  const fsExit=()=>{if(!fsOpen())return;fsSet(false);try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}
+    try{screen.orientation?.unlock?.()}catch(e){}if(history.state&&history.state.fs)history.back()};
+  $("#fsbtn").onclick=fsEnter;$("#fsx").onclick=fsExit;
+  window.addEventListener("popstate",()=>{if(fsOpen()&&document.body.contains(fsCard)){fsSet(false);try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}}});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&fsOpen()&&document.body.contains(fsCard))fsExit()});
+  document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&nativeFs&&fsOpen()&&document.body.contains(fsCard)){nativeFs=false;fsExit()}});
+  if(S.keepFs){S.keepFs=false;fsSet(true)}
+  {const navEl=document.createElement("div");navEl.className="sunav";navEl.innerHTML=`<span class="t sym">${esc(sym)}</span>`;navEl.title=c.name||sym;$("#ch-price").appendChild(navEl);
+   (async()=>{let N=S.setupNav;
+     if(!N||!N.list.some(x=>x.sym===sym)){try{const D=await setupsData(),R=await suRules();
+       N={list:D.recent.filter(r=>r.date===D.as_of&&suPass(r,R)).map(r=>({sym:r.symbol,date:r.date,sc:suScore(r,R),pattern:r.pattern,dir:r.dir})).sort((a,b)=>b.sc-a.sc),i:0}}catch(e){return}}
+     let i=N.list[N.i]&&N.list[N.i].sym===sym?N.i:N.list.findIndex(x=>x.sym===sym);if(i<0||!navEl.isConnected)return;N.i=i;S.setupNav=N;const it=N.list[i];
+     navEl.innerHTML=`<button data-d="-1" aria-label="Previous setup" title="Previous setup"${i===0?" disabled":""}>‹</button><span class="t"><b class="sym">${esc(sym)}</b> · ${i+1}/${N.list.length} · <span style="color:var(${it.dir>0?"--good":"--bad"})">${it.dir>0?"▲":"▼"} ${esc(PATSHORT[it.pattern]||"")}</span> · ${it.sc}</span><button data-d="1" aria-label="Next setup" title="Next setup"${i===N.list.length-1?" disabled":""}>›</button>`;navEl.hidden=false;
+     navEl.onclick=e=>{const b=e.target.closest("button[data-d]");if(!b||b.disabled)return;const j=i+(+b.dataset.d),n=N.list[j];N.i=j;S.focusSetup={sym:n.sym,date:n.date};S.keepFs=fsOpen();
+       if(fsOpen())fsSet(false);S.navReplace=true;location.replace("#company-"+enc(n.sym))}})()}
+  const t0=c.price.t[0]||"",yrsHist=c.price.t.length?(new Date(c.price.t[c.price.t.length-1])-new Date(t0))/3.156e10:0;
+  $("#rng").querySelectorAll("button").forEach(b=>{const y={"3M":.25,"6M":.5,"1Y":1,"3Y":3,"5Y":5,"10Y":10}[b.dataset.r];if(y&&y>yrsHist+0.5)b.hidden=true});
+  const setR=r=>{const t=c.price.t;if(!t.length)return;const end=t[t.length-1];if(r==="Auto"&&DATA.length>60){autoR();return}
+    const y={"3M":.25,"6M":.5,"1Y":1,"3Y":3,"5Y":5,"10Y":10}[r];
+    if(r==="Max"||!y||y>=yrsHist){pc.timeScale().fitContent();return}
+    const d0=new Date(end);d0.setMonth(d0.getMonth()-Math.round(y*12));let from=d0.toISOString().slice(0,10);if(from<t0)from=t0;
+    pc.timeScale().setVisibleRange({from,to:end})};
+  // Auto: open on the candles needed for analysis - back to where today's levels formed, 60 to 160 candles
+  const autoR=()=>{const n=DATA.length,set=$("#lvset").value==="off"?"daily":$("#lvset").value;let s0=n-60;
+    try{const H=chains(set);[...(H.zones||[]),...(H.swings||[])].forEach(z=>{if(z.to===LV.as_of){const i=IDX[z.start];if(i!=null)s0=Math.min(s0,i-8)}})}catch(e){}
+    s0=Math.max(n-(innerWidth<700?110:160),Math.min(n-60,s0));pc.timeScale().setVisibleLogicalRange({from:s0,to:n+3})};
+  const r0=hasOHLC?(DATA.length>60?"Auto":"Max"):(yrsHist>=5?"5Y":"Max");$("#rng").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.r===r0));setR(r0);
+  if(S.focusSetup&&S.focusSetup.sym===sym){const f=S.focusSetup;S.focusSetup=null;const i=IDX[f.date];
+    if(i!=null){pc.timeScale().setVisibleLogicalRange({from:i-(innerWidth<700?70:110),to:i+Math.min(25,DATA.length-1-i)+4});const x=SU.find(z=>z.date===f.date);
+      if(x){const ln=pl.createPriceLine({price:x.dir>0?x.lo:x.hi,color:x.dir>0?css("--good"):css("--bad"),lineWidth:2,lineStyle:0,axisLabelVisible:true,title:""});
+        $("#ch-price").closest(".card").insertAdjacentHTML("afterbegin",`<div class="banner" style="margin-bottom:8px">${esc(f.date)}: ${esc(PATNAME[x.pattern])} · ${esc(x.level)} ${nf(x.lo,x.lo<100?2:0)}${x.hi!==x.lo?"–"+nf(x.hi,x.hi<100?2:0):""} · score ${x.score}</div>`)}}
+    setTimeout(()=>$("#ch-price").scrollIntoView({block:"center"}),50)}
+  $("#rng").onclick=e=>{const b=e.target.closest("button");if(!b||!b.dataset.r)return;$("#rng").querySelectorAll("button[data-r]").forEach(x=>x.classList.toggle("on",x===b));setR(b.dataset.r)};
+
+  // valuation chart
+  const vc=mkChart($("#ch-val"),{fmt:p=>p.toFixed(1)});
+  let vs=[];
+  const drawVal=k=>{vs.forEach(s=>vc.removeSeries(s));vs=[];if(!c.val){$("#lg-val").textContent="No valuation history yet.";return}
+    const main=vc.addLineSeries({color:PAL[0],lineWidth:2});main.setData(ser(c.val.t,c.val[k]));vs.push(main);
+    const st=c.history_stats[k];
+    if(st){main.createPriceLine({price:st.median,color:css("--muted"),lineStyle:2,lineWidth:1,axisLabelVisible:true,title:"own median"})}
+    const ss=sec.series&&sec.series[k];
+    if(ss&&ss.t.length){const s2=vc.addLineSeries({color:PAL[1],lineWidth:1,lineStyle:0});s2.setData(ser(ss.t,ss.v));vs.push(s2)}
+    vc.timeScale().fitContent();
+    $("#lg-val").innerHTML=`<span><i style="background:${PAL[0]}"></i>${esc(c.symbol)}</span>${ss?`<span><i style="background:${PAL[1]}"></i>Sector median</span>`:""}<span>Dashed: own median ${st?st.median.toFixed(1):"–"} · now at ${st&&st.pct!=null?(st.pct*100).toFixed(0)+"th":"–"} percentile</span>`};
+  drawVal(c.financial?"pb":"pe");
+  $("#vm").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#vm").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));drawVal(b.dataset.k)};
+
+  // fundamentals chart
+  const pcts=new Set(["roce","roe","opm","npm"]);
+  const fc=mkChart($("#ch-fund"),{fmt:p=>p.toFixed(1)});let fs=null;
+  const drawF=k=>{if(fs)fc.removeSeries(fs);const mul=pcts.has(k)?100:1;
+    fs=fc.addHistogramSeries({color:PAL[0]});
+    fs.setData(c.annual.filter(a=>a[k]!=null&&a.period_end).map(a=>({time:a.period_end,value:a[k]*mul,color:a[k]<0?css("--bad"):PAL[0]})));
+    const sm=sec["median_"+k];if(sm!=null)fs.createPriceLine({price:sm*mul,color:PAL[1],lineStyle:2,lineWidth:1,axisLabelVisible:true,title:"sector"});
+    fc.timeScale().fitContent()};
+  const fsel=$("#fm");if(fsel.value)drawF(fsel.value);fsel.onchange=()=>drawF(fsel.value);
+
+  // annual table
+  const rows=c.annual.slice().reverse().map(a=>({...a,symbol:String(a.fy)}));
+  table($("#annual-t"),[{k:"fy",l:"FY"},{k:"revenue",l:"Revenue",n:1,r:x=>nf(x.revenue,0)},{k:"ebitda",l:"EBITDA",n:1,r:x=>nf(x.ebitda,0)},
+    {k:"net_income",l:"Net profit",n:1,r:x=>nf(x.net_income,0)},{k:"eps",l:"EPS",n:1,r:x=>nf(x.eps,2)},{k:"rev_growth",l:"Rev growth",n:1,r:x=>pct(x.rev_growth)},
+    {k:"roce",l:"ROCE",n:1,r:x=>pct(x.roce)},{k:"roe",l:"ROE",n:1,r:x=>pct(x.roe)},{k:"opm",l:"OPM",n:1,r:x=>pct(x.opm)},
+    {k:"debt",l:"Debt",n:1,r:x=>nf(x.debt,0)},{k:"de",l:"D/E",n:1,r:x=>nf(x.de,2)},{k:"fcf",l:"FCF",n:1,r:x=>nf(x.fcf,0)},{k:"cash_conversion",l:"CFO/PAT",n:1,r:x=>nf(x.cash_conversion,2)}],
+    rows,{sort:"fy",dir:-1});
+}
+function coffeeGrid(cc){
+  const d=cc.detail||[];if(!d.length)return"<p class='muted'>No data.</p>";
+  const cell=ok=>`<div class="${ok==null?"na":ok?"ok":"no"}">${ok==null?"·":ok?"✓":"✗"}</div>`;
+  return`<div class="ccgrid" style="--n:${d.length}"><div class="lab"></div>${d.map(x=>`<div class="lab" style="text-align:center">${String(x.fy).slice(2)}</div>`).join("")}
+   <div class="lab">Growth &gt;10%</div>${d.map(x=>cell(x.growth_ok)).join("")}
+   <div class="lab">${cc.metric} &gt;15%</div>${d.map(x=>cell(x.quality_ok)).join("")}</div>
+   <p style="margin:8px 0 4px">${ccPill(cc.status,cc.years_checked)} <span class="note">${cc.years_checked} of ${cc.years_needed} years checked${cc.failed_years.length?" · failed in "+cc.failed_years.join(", "):""}</span></p>`}
+function decomp(d){
+  if(!d)return"<p class='muted'>Needs at least a year of profitable history.</p>";
+  const tot=Math.abs(d.earnings_cagr)+Math.abs(d.rerating_cagr)||1;
+  const bar=(lab,x)=>`<div style="margin:8px 0"><div class="row between"><span>${lab}</span><b class="mono">${pct(x)}/yr</b></div><div class="bar"><i class="${x<0?"neg":""}" style="left:0;width:${Math.min(100,Math.abs(x)/tot*100)}%"></i></div></div>`;
+  return`<p class="note" style="margin-top:0">${d.from} to ${d.to} (${d.years} years). Price return ≈ earnings growth + change in PE.</p>
+   ${bar("Price",d.price_cagr)}${bar("Earnings growth",d.earnings_cagr)}${bar("Re-rating (PE "+d.pe_from.toFixed(0)+" → "+d.pe_to.toFixed(0)+")",d.rerating_cagr)}
+   <p class="note">${d.share_from_earnings==null?"":d.share_from_earnings>0.7?"Mostly earned through profit growth.":d.share_from_earnings<0.3?"Mostly driven by the market paying a higher multiple.":"A mix of profit growth and re-rating."}</p>`}
+function peerDiff(c){
+  const d=(c.peer&&c.peer.vs_sector)||[];if(!d.length)return"<p class='muted'>Not enough peer data.</p>";
+  const f=k=>["npm","opm","roce","roe","rev_cagr3"].includes(k)?pct:x=>sx(x,2);
+  return`<div style="overflow-x:auto"><table><thead><tr><th>Metric</th><th class="n">${esc(c.symbol)}</th><th class="n">Sector median</th><th>Difference</th></tr></thead><tbody>${d.map(x=>{
+    const r=x.rel;const w=r==null?0:Math.min(50,Math.abs(r)*50);const good=x.metric==="leverage"?r<0:r>0;
+    return`<tr><td>${esc(x.label)}</td><td class="n">${f(x.metric)(x.value)}</td><td class="n">${f(x.metric)(x.sector)}</td><td style="min-width:120px"><div class="bar"><i class="${good?"":"neg"}" style="left:${r<0?50-w:50}%;width:${w}%"></i></div></td></tr>`}).join("")}</tbody></table></div>
+   <p class="note">ROE splits into net margin × asset turnover × leverage (DuPont), which shows whether the company earns more through pricing power, efficiency or borrowing.</p>`}
+function estimates(c){
+  const e=c.estimates||{},a=c.analyst||{};let h="";
+  const ne=Array.isArray(e.next_earnings)?e.next_earnings[0]:e.next_earnings;
+  if(ne)h+=`<p style="margin-top:0">Next results expected around <b>${esc(ne)}</b>.</p>`;
+  const rowE=(lab,o,fmt)=>o?`<tr><td>${lab}</td><td class="n">${fmt(o.avg)}</td><td class="n">${fmt(o.low)} – ${fmt(o.high)}</td><td class="n">${o.growth==null?"–":pct(o.growth)}</td><td class="n">${o.numberOfAnalysts??"–"}</td></tr>`:"";
+  const eps=e.eps||{},rev=e.revenue||{};
+  const rcr=x=>x==null?"–":cr(x/1e7);
+  const body=rowE("EPS this quarter",eps["0q"],x=>nf(x,2))+rowE("EPS this FY",eps["0y"],x=>nf(x,2))+rowE("EPS next FY",eps["+1y"],x=>nf(x,2))+rowE("Revenue this quarter",rev["0q"],rcr)+rowE("Revenue this FY",rev["0y"],rcr);
+  if(body)h+=`<div style="overflow-x:auto"><table><thead><tr><th>Consensus</th><th class="n">Avg</th><th class="n">Range</th><th class="n">Growth</th><th class="n">Analysts</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  const su=(e.surprises||[]).filter(x=>x.reported!=null).slice(0,6);
+  if(su.length)h+=`<h3 style="margin:14px 0 6px">Recent results vs estimate</h3><div class="row">${su.map(x=>`<span class="pill ${x.surprise_pct>=0?"p-good":"p-bad"}" title="EPS ${x.reported} vs ${x.estimate}">${x.date.slice(0,7)} ${x.surprise_pct>=0?"+":""}${nf(x.surprise_pct,1)}%</span>`).join("")}</div>`;
+  if(a.targetMeanPrice)h+=`<p class="note">Analyst mean target ${rs(a.targetMeanPrice)} (${a.numberOfAnalystOpinions||"?"} analysts, "${esc(a.recommendationKey||"")}"). Treat as sentiment, not value.</p>`;
+  return h||"<p class='muted'>No consensus estimates available for this company.</p>"}
+function feedHtml(items,showCo=true){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="mono note">${esc((e.date||"").replace("T"," "))}</span><div>${showCo?`<a href="#company-${enc(e.symbol)}"><b>${esc(e.symbol)}</b></a> · `:""}<b>${esc(e.subject||e.kind)}</b><div class="note">${esc(e.text)}</div>${e.link&&/^https:\/\//.test(e.link)?`<a href="${esc(e.link)}" target="_blank" rel="noopener">Filing</a>`:""}</div></div>`).join("")}</div>`:""}
+
+/* ================= SECTOR ================= */
+async function viewSector(ind){
+  const v=$("#view");ind=ind||S.sectorKeys[0];S.lastSector=ind;const sec=S.sectors[ind];
+  if(!sec){v.innerHTML='<div class="empty">No sector data.</div>';return}
+  const rows=S.summary.filter(r=>r.industry===ind);const fin=sec.financial,q=fin?"roe":"roce";
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s4)">
+   <div class="row between"><div><h1>${esc(ind)}</h1><p class="muted" style="margin:4px 0 0">${sec.count} Nifty 500 companies · ${cr(sec.total_mcap)} combined market cap</p></div>
+    <select id="sec-sel" aria-label="Choose sector">${S.sectorKeys.map((k,i)=>`<option value="${i}" ${k===ind?"selected":""}>${esc(k)} (${S.sectors[k].count})</option>`).join("")}</select></div>
+   <div class="kpis">
+    <div class="kpi"><b>${sx(sec.median_pe)}</b><span>median PE</span></div><div class="kpi"><b>${sx(sec.median_pb)}</b><span>median P/B</span></div>
+    <div class="kpi"><b>${pct(fin?sec.median_roe:sec.median_roce)}</b><span>median ${fin?"ROE":"ROCE"}</span></div>
+    <div class="kpi"><b>${pct(sec.median_rev_cagr3)}</b><span>median revenue CAGR 3y</span></div>
+    <div class="kpi"><b>${fin?pct(sec.median_npm):pct(sec.median_opm)}</b><span>median ${fin?"net":"operating"} margin</span></div>
+    <div class="kpi"><b>${rows.filter(r=>r.coffee_can==="Pass"||r.coffee_can==="Pass so far").length}</b><span>pass Coffee Can</span></div>
+   </div>
+   <div class="grid g2">
+    <div class="card"><div class="row between"><h3>Valuation through time, top peers vs sector median</h3><div class="row" id="sv">${[["pe","PE"],["pb","P/B"],["ev_ebitda","EV/EBITDA"]].map(([k,l])=>`<button data-k="${k}" class="${k===(fin?"pb":"pe")?"on":""}">${l}</button>`).join("")}</div></div>
+     <div class="chart" id="ch-sec"></div><div class="legend" id="lg-sec"></div></div>
+    <div class="card"><h3>What the market rewards here</h3><p class="note" style="margin-top:0">Rank correlation between each factor and ${fin?"P/B":"PE"} across peers today. A strong positive bar means investors pay more for companies that score higher on it.</p>
+     ${(sec.rewards||[]).map(r=>`<div style="margin:8px 0"><div class="row between"><span>${esc((FACT[r.factor]||{l:r.factor}).l)}</span><b class="mono">${r.rho.toFixed(2)}</b></div><div class="bar"><i class="${r.rho<0?"neg":""}" style="left:${r.rho<0?50+r.rho*50:50}%;width:${Math.abs(r.rho)*50}%"></i></div></div>`).join("")||"<p class='muted'>Too few peers.</p>"}
+    </div>
+   </div>
+   <div class="card"><div class="row between"><h3>Peer fundamentals by year</h3><select id="sf" aria-label="Peer metric">${[[q,fin?"ROE":"ROCE"],["rev_growth","Revenue growth"],["opm","Operating margin"],["npm","Net margin"],["de","Debt / Equity"],["revenue","Revenue"]].filter(([k])=>!(fin&&(k==="opm"||k==="de"))).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></div><div class="chart sm" id="ch-secf"></div><div class="legend" id="lg-secf"></div></div>
+   <div><h2 style="margin-bottom:8px">Peer-to-peer table</h2><div id="peer-t"></div>
+   <p class="note">Justified PE comes from a regression of PE on ${fin?"ROE":"ROCE"} and 3-year revenue growth across this sector. A PE well above it means the premium is not explained by quality or growth.</p></div>
+  </div>`;
+  $("#sec-sel").onchange=e=>go("sector-"+e.target.value);
+  table($("#peer-t"),[{k:"name",l:"Company",r:nameCell},{k:"mcap",l:"Mkt cap",n:1,r:x=>cr(x.mcap)},{k:"pe",l:"PE",n:1,r:x=>sx(x.pe)},{k:"justified_pe",l:"Justified PE",n:1,h:1,r:x=>sx(x.justified_pe)},
+    {k:"pb",l:"P/B",n:1,h:1,r:x=>sx(x.pb)},{k:q,l:fin?"ROE":"ROCE",n:1,r:x=>pct(x[q])},{k:"rev_cagr3",l:"Rev CAGR 3y",n:1,r:x=>pct(x.rev_cagr3)},{k:"ni_cagr3",l:"Profit CAGR 3y",n:1,h:1,r:x=>pct(x.ni_cagr3)},
+    {k:fin?"npm":"opm",l:fin?"Net margin":"OPM",n:1,h:1,r:x=>pct(fin?x.npm:x.opm)},...(fin?[]:[{k:"de",l:"D/E",n:1,h:1,r:x=>sx(x.de,2)}]),{k:"ret_1y",l:"1y",n:1,h:1,r:x=>pct(x.ret_1y,0)},
+    {k:"cc_years",l:"Coffee Can",h:1,r:x=>ccPill(x.coffee_can,x.cc_years)},{k:"score",l:"Valuation",r:x=>verdictPill(x.verdict)}],rows,{onRow:goCompany});
+
+  const top=sec.members.slice(0,7);if(S.lastCompany&&sec.members.includes(S.lastCompany)&&!top.includes(S.lastCompany))top.push(S.lastCompany);
+  const peers=(await Promise.all(top.map(s=>company(s).catch(()=>null)))).filter(Boolean);
+  if(S.lastSector!==ind)return;
+  const ch=mkChart($("#ch-sec"),{fmt:p=>p.toFixed(1)});let ss=[];
+  const draw=k=>{ss.forEach(s=>ch.removeSeries(s));ss=[];
+    peers.forEach((p,i)=>{if(!p.val)return;const s=ch.addLineSeries({color:PAL[(i+2)%PAL.length],lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});s.setData(ser(p.val.t,p.val[k].map(x=>x!=null&&x<500?x:null)));ss.push(s)});
+    const sm=sec.series&&sec.series[k];if(sm){const s=ch.addLineSeries({color:css("--ink"),lineWidth:3});s.setData(ser(sm.t,sm.v));ss.push(s)}
+    ch.timeScale().fitContent();
+    $("#lg-sec").innerHTML=`<span><i style="background:${css("--ink")}"></i>Sector median</span>`+peers.map((p,i)=>`<span><i style="background:${PAL[(i+2)%PAL.length]}"></i>${esc(p.symbol)}</span>`).join("")};
+  draw(fin?"pb":"pe");
+  $("#sv").onclick=e=>{const b=e.target.closest("button");if(!b)return;$("#sv").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));draw(b.dataset.k)};
+  const cf=mkChart($("#ch-secf"),{fmt:p=>p.toFixed(1)});let fs=[];
+  const drawF=k=>{fs.forEach(s=>cf.removeSeries(s));fs=[];const mul=["roce","roe","opm","npm","rev_growth"].includes(k)?100:1;
+    peers.forEach((p,i)=>{const d=p.annual.filter(a=>a[k]!=null&&a.period_end).map(a=>({time:a.period_end,value:a[k]*mul}));if(!d.length)return;
+      const s=cf.addLineSeries({color:PAL[(i+2)%PAL.length],lineWidth:2,pointMarkersVisible:true,priceLineVisible:false,lastValueVisible:false});s.setData(d);fs.push(s)});
+    cf.timeScale().fitContent();
+    $("#lg-secf").innerHTML=peers.map((p,i)=>`<span><i style="background:${PAL[(i+2)%PAL.length]}"></i>${esc(p.symbol)}</span>`).join("")+`<span class="note">Largest ${peers.length} by market cap</span>`};
+  drawF($("#sf").value);$("#sf").onchange=e=>drawF(e.target.value);
+}
+
+/* ================= FACTORS ================= */
+function viewFactors(){
+  const v=$("#view");const keys=Object.keys(FACT);const inds=[...new Set(S.summary.map(r=>r.industry))].sort();
+  const opt=(sel)=>keys.map(k=>`<option value="${k}" ${k===sel?"selected":""}>${esc(FACT[k].l)}</option>`).join("");
+  v.innerHTML=`
+  <div class="grid" style="gap:var(--s4)">
+   <div><h1>Factor vs factor</h1><p class="muted" style="margin:4px 0 0">Plot any two measures across companies. The classic check: are you paying more for genuinely better businesses?</p></div>
+   <div class="row">
+    <label>Y <select id="fy">${opt("pe")}</select></label><label>X <select id="fx">${opt("roce")}</select></label>
+    <select id="fi" aria-label="Sector filter"><option value="">All sectors</option>${inds.map(i=>`<option ${i===S.factorInd?"selected":""}>${esc(i)}</option>`).join("")}</select>
+    <label class="row" style="gap:4px"><input type="checkbox" id="flog"> log Y</label>
+    <span class="note" id="fstat"></span>
+   </div>
+   <div class="card"><div class="scatter" id="sc"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>Looks cheap</span><span><i style="background:var(--muted)"></i>Around fair</span><span><i style="background:var(--bad)"></i>Looks expensive</span><span>Ring = passes Coffee Can on available years. Dot size = market cap. Tap a dot for details, tap again to open it.</span></div></div>
+  </div>`;
+  const draw=()=>{S.factorInd=$("#fi").value;scatter($("#fx").value,$("#fy").value,$("#fi").value,$("#flog").checked)};
+  ["fx","fy","fi","flog"].forEach(id=>$("#"+id).onchange=draw);draw();
+  let rt;window.onresize=()=>{clearTimeout(rt);rt=setTimeout(()=>{if(location.hash==="#factors")draw()},150)};
+}
+function scatter(xk,yk,ind,logY){
+  const cv=$("#cv"),box=$("#sc"),tip=$("#tip");const dpr=window.devicePixelRatio||1;
+  const W=box.clientWidth,H=box.clientHeight;cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext("2d");g.scale(dpr,dpr);
+  let pts=S.summary.filter(r=>(!ind||r.industry===ind)&&r[xk]!=null&&r[yk]!=null&&(!logY||r[yk]>0)).map(r=>({r,x:r[xk],y:r[yk]}));
+  const q=(arr,p)=>{const s=arr.slice().sort((a,b)=>a-b);return s[Math.floor((s.length-1)*p)]};
+  if(pts.length<3){g.fillStyle=css("--muted");g.fillText("Not enough data for these two factors.",20,30);$("#fstat").textContent="";return}
+  // trim extreme outliers (1st/99th pct) so the cloud is readable
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);const x0=q(xs,.01),x1=q(xs,.99),y0=q(ys,.01),y1=q(ys,.99);
+  pts=pts.filter(p=>p.x>=x0&&p.x<=x1&&p.y>=y0&&p.y<=y1);
+  const fy=logY?Math.log10:(v=>v);const narrow=W<560;const L=narrow?48:64,R=narrow?8:16,T=16,B=40;
+  const mnx=Math.min(...pts.map(p=>p.x)),mxx=Math.max(...pts.map(p=>p.x)),mny=Math.min(...pts.map(p=>fy(p.y))),mxy=Math.max(...pts.map(p=>fy(p.y)));
+  const px=x=>L+(x-mnx)/((mxx-mnx)||1)*(W-L-R),py=y=>H-B-(fy(y)-mny)/((mxy-mny)||1)*(H-T-B);
+  g.strokeStyle=css("--chart-grid");g.fillStyle=css("--muted");g.font="11px IBM Plex Mono, monospace";g.lineWidth=1;
+  const NT=narrow?4:5;for(let i=0;i<=NT;i++){const xv=mnx+(mxx-mnx)*i/NT,X=px(xv);g.beginPath();g.moveTo(X,T);g.lineTo(X,H-B);g.stroke();g.textAlign="center";g.fillText(FACT[xk].f(xv),X,H-B+16)}
+  for(let i=0;i<=5;i++){const yl=mny+(mxy-mny)*i/5,yv=logY?10**yl:yl,Y=H-B-(yl-mny)/((mxy-mny)||1)*(H-T-B);g.beginPath();g.moveTo(L,Y);g.lineTo(W-R,Y);g.stroke();g.textAlign="right";g.fillText(FACT[yk].f(yv),L-6,Y+4)}
+  g.textAlign="center";g.fillStyle=css("--ink");g.fillText(FACT[xk].l+" →",(L+W-R)/2,H-6);
+  g.save();g.translate(14,(T+H-B)/2);g.rotate(-Math.PI/2);g.fillText(FACT[yk].l+" →",0,0);g.restore();
+  const col=v=>v==="Looks cheap"?css("--good"):v==="Looks expensive"?css("--bad"):css("--muted");
+  const mc=pts.map(p=>p.r.mcap||1),mmax=Math.max(...mc);
+  pts.forEach(p=>{p.X=px(p.x);p.Y=py(p.y);p.rad=3+Math.sqrt((p.r.mcap||0)/mmax)*14});
+  pts.sort((a,b)=>b.rad-a.rad).forEach(p=>{g.beginPath();g.arc(p.X,p.Y,p.rad,0,7);g.globalAlpha=.55;g.fillStyle=col(p.r.verdict);g.fill();g.globalAlpha=1;
+    if(p.r.coffee_can==="Pass"||p.r.coffee_can==="Pass so far"){g.lineWidth=2;g.strokeStyle=css("--accent");g.stroke()}});
+  const me=pts.find(p=>p.r.symbol===S.lastCompany);if(me){g.beginPath();g.arc(me.X,me.Y,me.rad+4,0,7);g.lineWidth=3;g.strokeStyle=css("--ink");g.stroke();g.fillStyle=css("--ink");g.font="600 12px IBM Plex Mono, monospace";g.textAlign="left";g.fillText(me.r.symbol,me.X+me.rad+6,me.Y+4)}
+  if(ind||pts.length<60){g.fillStyle=css("--ink");g.textAlign="left";g.font="10px IBM Plex Mono, monospace";pts.forEach(p=>g.fillText(p.r.symbol,p.X+p.rad+2,p.Y+3))}
+  // rank correlation
+  const rk=a=>{const s=a.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]);const r=Array(a.length);s.forEach((v,i)=>r[v[1]]=i);return r};
+  const rx=rk(pts.map(p=>p.x)),ry=rk(pts.map(p=>p.y));const n=pts.length,mx=(n-1)/2;let a=0,b=0,c=0;for(let i=0;i<n;i++){a+=(rx[i]-mx)*(ry[i]-mx);b+=(rx[i]-mx)**2;c+=(ry[i]-mx)**2}
+  $("#fstat").textContent=`${n} companies · rank correlation ${(a/Math.sqrt(b*c)).toFixed(2)}`;
+  const hit=e=>{const rc=cv.getBoundingClientRect(),X=e.clientX-rc.left,Y=e.clientY-rc.top;let best=null,bd=1e9;pts.forEach(p=>{const d=(p.X-X)**2+(p.Y-Y)**2;if(d<bd&&d<(p.rad+4)**2){bd=d;best=p}});return[best,X,Y]};
+  let shown=null;
+  const show=(p,X,Y)=>{shown=p;if(!p){tip.style.display="none";cv.style.cursor="default";return}cv.style.cursor="pointer";
+    tip.innerHTML=`<b>${esc(p.r.name)}</b> <span class="mono muted">${esc(p.r.symbol)}</span><br>${esc(FACT[xk].l)}: ${FACT[xk].f(p.x)}<br>${esc(FACT[yk].l)}: ${FACT[yk].f(p.y)}<br>${verdictPill(p.r.verdict)}<br><a href="#company-${enc(p.r.symbol)}" style="color:var(--accent);pointer-events:auto">Open company</a>`;
+    tip.style.display="block";tip.style.left=Math.max(0,Math.min(X+12,W-210))+"px";tip.style.top=Math.max(0,Math.min(Y-10,H-110))+"px"};
+  cv.onpointermove=e=>{if(e.pointerType==="mouse"){const[p,X,Y]=hit(e);show(p,X,Y)}};
+  cv.onmouseleave=()=>show(null);
+  cv.onclick=e=>{const[p,X,Y]=hit(e);if(!p){show(null);return}
+    if(shown===p||matchMedia("(hover:hover)").matches)goCompany(p.r.symbol);else show(p,X,Y)};
+}
+
+/* ================= NEWS ================= */
+
+const PATNAME={bull_engulf:"Bullish engulfing",bear_engulf:"Bearish engulfing",bull_harami:"Bullish harami",bear_harami:"Bearish harami",piercing:"Piercing line",dark_cloud:"Dark cloud cover",morning_star:"Morning star",evening_star:"Evening star"};
+const PATSHORT={bull_engulf:"Engulf",bear_engulf:"Engulf",bull_harami:"Harami",bear_harami:"Harami",piercing:"Pierce",dark_cloud:"DCC",morning_star:"M-star",evening_star:"E-star"};
+async function setupsData(){if(!S.setups)S.setups=getJSON("data/setups.json");return S.setups}
+/* Scoring rules: defaults from config/setup_rules.json (published as data/setup_rules.json), your changes saved on this device.
+   suScore/suPass mirror score()/matches() in pipeline/setups.py, so alerts and this screen agree. */
+const SU_KEY="his.setupRules";
+async function suBase(){if(!S.suBase)S.suBase=getJSON("data/setup_rules.json").catch(()=>({}));return S.suBase}
+function suMerge(a,b){const o=JSON.parse(JSON.stringify(a||{}));for(const[k,v]of Object.entries(b||{}))o[k]=v&&typeof v==="object"&&!Array.isArray(v)&&o[k]&&typeof o[k]==="object"?{...o[k],...v}:v;return o}
+function suMine(){try{return JSON.parse(localStorage.getItem(SU_KEY)||"null")}catch(e){return null}}
+async function suRules(){const b=suMerge({min_score:60,weights:{level:35,pattern:25,volume:25,trend:15},level_full_at:0.6,volume:{floor:0.7,full:2},tolerance_atr:0.25,direction:"both",patterns:{},kinds:{test:true,break:true},level_types:{zone:true,swing:true}},await suBase());return suMerge(b,suMine())}
+function suScore(s,R){const w=R.weights,c=k=>Math.max(0,+w[k]||0),tot=c("level")+c("pattern")+c("volume")+c("trend")||1,V=R.volume;
+  const vs=s.vol==null?0.5:Math.max(0,Math.min(1,(s.vol-V.floor)/Math.max(1e-9,V.full-V.floor)));
+  return Math.round(100*(c("level")*Math.min(1,(s.zs??0)/Math.max(1e-9,R.level_full_at))+c("pattern")*s.strength+c("volume")*vs+c("trend")*(s.trend?1:0))/tot)}
+function suPass(s,R,noScore){if(R.patterns[s.pattern]===false||R.kinds[s.kind]===false||R.level_types[s.lt||"zone"]===false)return false;
+  if((R.direction==="bull"&&s.dir<0)||(R.direction==="bear"&&s.dir>0))return false;if((s.tol||0)>R.tolerance_atr+1e-9)return false;
+  return noScore||suScore(s,R)>=R.min_score}
+/* Calls: setups backed by evidence from Research (model), Explorer (validated factor zones), Zones (how the stock
+   behaves between zones) and your live Backtest strategies. Settings saved on this device. */
+const CALL_KEY="his.calls";
+const CALL_DEF={days:3,need:2,use:{zone:true,model:true,behave:true,strategy:true},zone:{min_n:100,min_r:0.05},model:{min_exp:0.05,min_prob:0.55,oos:true},behave:{test:"deflecting",brk:"directional"},min_score:0};
+const callLoad=()=>{try{const o=JSON.parse(localStorage.getItem(CALL_KEY)||"{}");return {...CALL_DEF,...o,use:{...CALL_DEF.use,...(o.use||{})},zone:{...CALL_DEF.zone,...(o.zone||{})},model:{...CALL_DEF.model,...(o.model||{})},behave:{...CALL_DEF.behave,...(o.behave||{})}}}catch(e){return JSON.parse(JSON.stringify(CALL_DEF))}};
+const callSave=c=>{try{localStorage.setItem(CALL_KEY,JSON.stringify(c))}catch(e){}};
+async function viewSetups(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading calls…</div>';
+  let D;try{D=await setupsData()}catch(e){v.innerHTML='<div class="empty">Setups appear after the next daily build.</div>';return}
+  const [L,ZA,LS]=await Promise.all([getJSON("data/research_live.json").catch(()=>null),getJSON("data/zones/_all.json").catch(()=>null),liveSignals().catch(()=>null)]);
+  let R=await suRules();
+  if((location.hash.slice(1)||"setups")!=="setups")return;
+  const C=callLoad(),P=D.patterns||PATNAME,dates=[...new Set(D.recent.map(r=>r.date))].sort().reverse();
+  const ZM={};(ZA&&ZA.rows||[]).forEach(r=>ZM[r.sym]=r);
+  const LM={};(L&&L.predictions||[]).forEach(p=>LM[p.symbol+"|"+p.date+"|"+p.pattern]=p);const ZL=(L&&L.zones)||[];
+  const SM={};(LS||[]).forEach(x=>{(SM[x.c.sym+"|"+x.c.date+"|"+x.c.pattern]=SM[x.c.sym+"|"+x.c.date+"|"+x.c.pattern]||[]).push(x)});
+  const r2=x=>x==null||!isFinite(x)?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%",px=x=>x==null?"–":"₹"+nf(x,x<100?2:0);
+  const opt=(a,val)=>a.map(([x,l])=>`<option value="${esc(String(x))}"${String(x)===String(val)?" selected":""}>${esc(l)}</option>`).join("");
+  const W=[["level","Level strength"],["pattern","Pattern quality"],["volume","Volume"],["trend","Trend fit"]];
+  v.innerHTML=`<style>.calls{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+   .call{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+   .call.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+   .call h4{margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:16px}.call .sub{font-size:13px;color:var(--muted)}
+   .why{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:13px}.why li{display:grid;grid-template-columns:18px 1fr;gap:4px}
+   .why .y{color:var(--good);font-weight:700}.why .n{color:var(--muted)}.why b{font-weight:600}
+   .cset{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.cset fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}
+   .cset legend{font-weight:600;font-size:13px;padding:0 4px}.cset label{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;margin:4px 0}</style>
+  <div class="grid" style="gap:var(--s3)">
+   <div class="row between" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">Calls</h1><div class="row" style="gap:8px">
+     <select id="c-days" aria-label="Days">${opt([[1,"Latest day ("+(dates[0]||"")+")"],[3,"Last 3 days"],[5,"Last 5 days"]],C.days)}</select>
+     <select id="c-need" aria-label="Evidence needed">${opt([[1,"1+ reasons"],[2,"2+ reasons"],[3,"3+ reasons"],[4,"All 4 reasons"]],C.need)}</select></div></div>
+   <div id="c-pin"></div>
+   <div id="c-list"></div>
+   <details class="card" id="c-set"><summary style="cursor:pointer;font-weight:600">Call settings</summary>
+    <div class="cset" style="margin-top:10px">
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="zone"${C.use.zone?" checked":""}> Explorer: validated factor zone</label></legend>
+      <label>Fewest trades in the zone <select data-k="zone.min_n">${opt([50,100,200,500,1000].map(x=>[x,x]),C.zone.min_n)}</select></label>
+      <label>Average in both periods at least <select data-k="zone.min_r">${opt([0,0.05,0.1,0.15,0.2].map(x=>[x,"+"+x+"R"]),C.zone.min_r)}</select></label></fieldset>
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="model"${C.use.model?" checked":""}> Research: model odds</label></legend>
+      <label>Expected result at least <select data-k="model.min_exp">${opt([0,0.05,0.1,0.15,0.2].map(x=>[x,"+"+x+"R"]),C.model.min_exp)}</select></label>
+      <label>Win probability at least <select data-k="model.min_prob">${opt([0.5,0.55,0.6,0.65].map(x=>[x,Math.round(x*100)+"%"]),C.model.min_prob)}</select></label>
+      <label>Condition held out of sample <select data-k="model.oos">${opt([["true","Required"],["false","Not required"]],String(C.model.oos))}</select></label></fieldset>
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="behave"${C.use.behave?" checked":""}> Zones: how the stock moves</label></legend>
+      <label>Level tests (bounces) need <select data-k="behave.test">${opt([["deflecting","Deflecting stock"],["notdir","Not directional"],["any","Any"]],C.behave.test)}</select></label>
+      <label>Breakouts need <select data-k="behave.brk">${opt([["directional","Directional stock"],["notdefl","Not deflecting"],["any","Any"]],C.behave.brk)}</select></label></fieldset>
+     <fieldset><legend><label style="margin:0;justify-content:flex-start"><input type="checkbox" data-u="strategy"${C.use.strategy?" checked":""}> Backtest: your live strategies</label></legend>
+      <p class="note" style="margin:4px 0">${stList().filter(s=>s.live).map(s=>esc(s.name)).join(", ")||"None live yet. Save a strategy in Backtest and switch it live."}</p></fieldset>
+    </div>
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Setup scoring and filters</summary>
+     <div class="grid" style="gap:10px;margin-top:10px">
+      <label class="row" style="gap:10px;flex-wrap:wrap">Minimum score <input type="range" id="r-min" min="0" max="100" step="5" style="flex:1;min-width:140px"><b class="mono" id="r-minv"></b></label>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">${W.map(([k,l])=>`<label style="display:flex;flex-direction:column;gap:2px;font-size:13px"><span>${l} weight <b class="mono" id="r-w-${k}v"></b></span><input type="range" min="0" max="100" step="5" id="r-w-${k}"></label>`).join("")}</div>
+      <div class="row" style="gap:12px;flex-wrap:wrap;font-size:13px">
+       <label class="row" style="gap:6px">Touch tolerance <select id="r-tol">${[0.1,0.15,0.25,0.35,0.5].map(x=>`<option value="${x}">${x} ATR</option>`).join("")}</select></label>
+       <label class="row" style="gap:6px">Level full marks <select id="r-full">${[0.3,0.45,0.6,0.75,0.9].map(x=>`<option value="${x}">${x}</option>`).join("")}</select></label>
+       <label class="row" style="gap:6px">Volume full marks <select id="r-vol">${[1.5,2,2.5,3].map(x=>`<option value="${x}">${x}x</option>`).join("")}</select></label>
+       <label class="row" style="gap:6px">Direction <select id="r-dir"><option value="both">Both</option><option value="bull">Buys only</option><option value="bear">Sells only</option></select></label></div>
+      <div class="row" style="flex-wrap:wrap;gap:4px 12px;font-size:13px">${Object.keys(P).map(k=>`<label class="row" style="gap:4px"><input type="checkbox" data-rp="${k}">${esc(P[k])}</label>`).join("")}</div>
+      <div class="row" style="flex-wrap:wrap;gap:4px 12px;font-size:13px"><label class="row" style="gap:4px"><input type="checkbox" data-rk="test">Level tests</label><label class="row" style="gap:4px"><input type="checkbox" data-rk="break">Breakouts</label><label class="row" style="gap:4px"><input type="checkbox" data-rl="zone">Zones</label><label class="row" style="gap:4px"><input type="checkbox" data-rl="swing">Swing highs / lows</label></div>
+      <div class="row" style="gap:8px"><button id="r-reset">Reset scoring</button><button id="c-reset">Reset call settings</button></div></div></details>
+   </details>
+   <details class="card" id="c-other"><summary style="cursor:pointer;font-weight:600">Other setups <span class="note" id="c-on" style="font-weight:400"></span></summary><div id="c-ot" style="margin-top:8px"></div></details>
+  </div>`;
+  // ---------- evidence for one setup
+  const evid=r=>{const k=r.symbol+"|"+r.date+"|"+r.pattern,p=LM[k],z=ZM[r.symbol],y=z&&z.y1,E=[];
+    if(C.use.zone){const ms=p?(p.zones||[]).map(i=>ZL[i]).filter(q=>q&&q.n>=C.zone.min_n&&q.ta>=C.zone.min_r&&q.ea>=C.zone.min_r):[];
+      E.push({k:"zone",ok:ms.length>0,t:ms.length?`<b>Validated zone</b>: ${esc(ms[0].label)}. ${r2(ms[0].ta)}R before, ${r2(ms[0].ea)}R since, ${ms[0].n} trades, PF ${ms[0].pf??"–"}${ms.length>1?` <span class="note">(+${ms.length-1} more zones)</span>`:""}`:(p?"<b>Validated zone</b>: none matches":"<b>Validated zone</b>: no data yet")})}
+    if(C.use.model){const ok=p&&p.exp_r>=C.model.min_exp&&p.prob>=C.model.min_prob&&(!C.model.oos||["holds","weaker"].includes(p.verdict));
+      E.push({k:"model",ok:!!ok,t:p?`<b>Model</b>: p(win) ${pc(p.prob)}, expected ${r2(p.exp_r)}R (${p.n} similar trades; ${p.verdict==="holds"||p.verdict==="weaker"?"held up out of sample":"did not hold out of sample"})`:"<b>Model</b>: no prediction"})}
+    if(C.use.behave){const cls=y&&y.class,need=r.kind==="test"?C.behave.test:C.behave.brk;
+      const ok=!!cls&&(need==="any"||(need==="deflecting"&&cls==="deflecting")||(need==="directional"&&cls==="directional")||(need==="notdir"&&cls!=="directional"&&cls!=="thin")||(need==="notdefl"&&cls!=="deflecting"&&cls!=="thin"));
+      const nx=z&&z.now?(r.dir>0?z.now.above:z.now.below):null;
+      E.push({k:"behave",ok,t:y?`<b>Zones</b>: ${esc(r.symbol)} is ${esc(cls)} (last year ${y.z2z} zone-to-zone moves of ${y.z2z+y.failed} bounces, ${y.brk} breakouts${y.leg_zones?", "+y.leg_zones+" zones per run":""})${nx?`. Next zone ${px(nx[0])}–${px(nx[1])}`:""}`:"<b>Zones</b>: no zone data"})}
+    if(C.use.strategy){const s=SM[k]||[];E.push({k:"strategy",ok:s.length>0,t:s.length?`<b>Strategy</b>: ${s.map(x=>esc(x.s.name)+(x.st==="entered"?" (entered)":" (waiting for entry)")).join(", ")}`:"<b>Strategy</b>: no live strategy took it"})}
+    return E};
+  // ---------- scoring rules form (kept from before)
+  const form=()=>{$("#r-min").value=R.min_score;$("#r-minv").textContent=R.min_score;W.forEach(([k])=>{$("#r-w-"+k).value=R.weights[k]??0;$("#r-w-"+k+"v").textContent=R.weights[k]??0});
+    $("#r-tol").value=String(R.tolerance_atr);$("#r-full").value=String(R.level_full_at);$("#r-vol").value=String(R.volume.full);$("#r-dir").value=R.direction||"both";
+    v.querySelectorAll("[data-rp]").forEach(x=>x.checked=R.patterns[x.dataset.rp]!==false);v.querySelectorAll("[data-rk]").forEach(x=>x.checked=R.kinds[x.dataset.rk]!==false);v.querySelectorAll("[data-rl]").forEach(x=>x.checked=R.level_types[x.dataset.rl]!==false)};
+  const readR=()=>{const o={min_score:+$("#r-min").value,weights:{},tolerance_atr:+$("#r-tol").value,level_full_at:+$("#r-full").value,volume:{...R.volume,full:+$("#r-vol").value},direction:$("#r-dir").value,patterns:{},kinds:{},level_types:{}};
+    W.forEach(([k])=>o.weights[k]=+$("#r-w-"+k).value);v.querySelectorAll("[data-rp]").forEach(x=>o.patterns[x.dataset.rp]=x.checked);v.querySelectorAll("[data-rk]").forEach(x=>o.kinds[x.dataset.rk]=x.checked);v.querySelectorAll("[data-rl]").forEach(x=>o.level_types[x.dataset.rl]=x.checked);return o};
+  // ---------- draw
+  const card=(r,i,cls)=>{const E=r._E,n=E.filter(e=>e.ok).length;
+    return `<div class="call${cls||""}" data-i="${i}"><h4><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"BUY":"SELL"}</span><span class="mono">${esc(r.symbol)}</span><span class="note" style="font-weight:400">${esc(r.date.slice(5))}</span><span class="note" style="margin-left:auto;font-weight:400">${n}/${E.length} reasons</span><button class="pill p-neutral" data-note="${i}" title="Save this call to notes" style="cursor:pointer">+ Note</button></h4>
+     <div class="sub">${esc(P[r.pattern]||r.pattern)} ${r.kind==="test"?(r.dir>0?"holding support":"rejected at resistance"):(r.dir>0?"breaking resistance":"breaking support")} ${px(r.lo)}${r.hi!==r.lo?"–"+px(r.hi):""} · score ${r._sc}</div>
+     <ul class="why">${E.map(e=>`<li><span class="${e.ok?"y":"n"}">${e.ok?"✓":"·"}</span><span${e.ok?"":' class="note"'}>${e.t}</span></li>`).join("")}</ul></div>`};
+  let shown=[];
+  const draw=()=>{const from=dates[Math.min(C.days,dates.length)-1]||"";
+    const rows=D.recent.filter(r=>r.date>=from&&suPass(r,R,true)).map(r=>({...r,_sc:suScore(r,R)})).filter(r=>r._sc>=R.min_score);
+    rows.forEach(r=>{r._E=evid(r);r._n=r._E.filter(e=>e.ok).length});
+    const used=Object.values(C.use).filter(Boolean).length,need=Math.min(C.need,used||1);
+    const calls=rows.filter(r=>used&&r._n>=need).sort((a,b)=>b._n-a._n||b._sc-a._sc||(a.date<b.date?1:-1));
+    const rest=rows.filter(r=>!calls.includes(r)).sort((a,b)=>b._n-a._n||b._sc-a._sc);
+    shown=[...calls,...rest];const sel=S.lastCompany;
+    const pin=sel&&!calls.some(r=>r.symbol===sel)?rows.filter(r=>r.symbol===sel):[];
+    $("#c-pin").innerHTML=sel?(pin.length?`<div class="note" style="margin-bottom:4px">Selected: ${esc(sel)}</div><div class="calls">${pin.map(r=>card(r,shown.indexOf(r)," sel")).join("")}</div>`:(calls.some(r=>r.symbol===sel)?"":`<p class="note">Selected: <b>${esc(sel)}</b> has no setup in this window.</p>`)):"";
+    const cnt={};["zone","model","behave","strategy"].forEach(k=>cnt[k]=rows.filter(r=>r._E.some(e=>e.k===k&&e.ok)).length);
+    $("#c-list").innerHTML=calls.length?`<div class="calls">${calls.map(r=>card(r,shown.indexOf(r),r.symbol===sel?" sel":"")).join("")}</div>`
+      :`<div class="card"><p style="margin:0">No setup has ${need}+ reasons right now.</p><p class="note" style="margin:6px 0 0">Of ${rows.length} setups: ${cnt.zone} in a validated zone, ${cnt.model} with good model odds, ${cnt.behave} fit the stock's zone behaviour, ${cnt.strategy} taken by a live strategy. Lower "reasons" or loosen the call settings.</p></div>`;
+    $("#c-on").textContent=`· ${rest.length}`;
+    $("#c-ot").innerHTML=rest.length?`<div class="tablewrap"><table><thead><tr><th>Setup</th><th>Company</th><th class="hs">Day</th><th class="n">Score</th><th class="n">Reasons</th></tr></thead><tbody>${rest.map(r=>`<tr data-i="${shown.indexOf(r)}" style="cursor:pointer"><td><span class="pill ${r.dir>0?"p-good":"p-bad"}">${r.dir>0?"▲":"▼"} ${esc(PATSHORT[r.pattern]||r.pattern)}</span></td><td><b class="mono">${esc(r.symbol)}</b></td><td class="hs mono">${esc(r.date.slice(5))}</td><td class="n">${r._sc}</td><td class="n">${r._n}/${r._E.length}</td></tr>`).join("")}</tbody></table></div>`:'<p class="note">None.</p>';
+    v.querySelectorAll("[data-note]").forEach(b=>b.onclick=e=>{e.stopPropagation();const r=shown[+b.dataset.note];if(!r||!window.HisNotes)return;
+      const txt=`${r.dir>0?"BUY":"SELL"} ${r.symbol} · ${P[r.pattern]||r.pattern} ${r.date} · score ${r._sc}\n`+r._E.map(x=>(x.ok?"✓ ":"· ")+x.t.replace(/<[^>]+>/g,"")).join("\n")+"\n\nMy view: ";
+      HisNotes.capture(b.closest(".call"),{title:`${r.dir>0?"BUY":"SELL"} ${r.symbol} · ${r.date}`,text:txt,url:"#company-"+encodeURIComponent(r.symbol)})});
+    v.querySelectorAll("[data-i]").forEach(el=>el.onclick=()=>{const i=+el.dataset.i,r=shown[i];if(!r)return;S.focusSetup={sym:r.symbol,date:r.date};
+      S.setupNav={list:shown.map(y=>({sym:y.symbol,date:y.date,sc:y._sc,pattern:y.pattern,dir:y.dir})),i};goCompany(r.symbol)})};
+  $("#c-days").onchange=e=>{C.days=+e.target.value;callSave(C);draw()};
+  $("#c-need").onchange=e=>{C.need=+e.target.value;callSave(C);draw()};
+  v.querySelectorAll("[data-u]").forEach(x=>x.onchange=()=>{C.use[x.dataset.u]=x.checked;callSave(C);draw()});
+  v.querySelectorAll("[data-k]").forEach(x=>x.onchange=()=>{const [a,b]=x.dataset.k.split(".");C[a][b]=x.value==="true"?true:x.value==="false"?false:(isNaN(+x.value)?x.value:+x.value);callSave(C);draw()});
+  $("#c-reset").onclick=()=>{try{localStorage.removeItem(CALL_KEY)}catch(e){}viewSetups()};
+  let tmr;v.querySelector("#c-set details").addEventListener("input",e=>{if(!e.target.matches("input,select"))return;const o=readR();R=suMerge(R,o);$("#r-minv").textContent=o.min_score;W.forEach(([k])=>$("#r-w-"+k+"v").textContent=o.weights[k]);
+    try{localStorage.setItem(SU_KEY,JSON.stringify(o))}catch(e){}clearTimeout(tmr);tmr=setTimeout(draw,60)});
+  $("#r-reset").onclick=async()=>{try{localStorage.removeItem(SU_KEY)}catch(e){}R=await suRules();form();draw()};
+  form();draw();
+}
+/* ================= BACKTEST: setups turned into buy / sell trades ================= */
+// Defaults mirror DEFAULT_STRATEGY in pipeline/signals.py; btPass mirrors passes() there.
+const BT_DEF={min_score:70,dir:"both",kinds:{test:true,break:true},patterns:{},trend:"sma50",no_counter_200:true,min_vol:1.5,brk_atr:0.5,tol:0.25,
+  entry:"break",entry_days:3,stop_atr:0.25,min_rr:2,no_target:"allow",partial_r:1,partial_frac:0.5,be_after_partial:true,trail_atr:2,max_days:15,risk_pct:1,max_open:5};
+const BT_KEY="his.btParams",ST_KEY="his.strategies";
+const btLoadP=()=>{try{return suMerge(BT_DEF,JSON.parse(localStorage.getItem(BT_KEY)||"{}"))}catch(e){return suMerge(BT_DEF,{})}};
+const stList=()=>{try{return JSON.parse(localStorage.getItem(ST_KEY)||"[]")}catch(e){return[]}};
+const stSave=l=>{try{localStorage.setItem(ST_KEY,JSON.stringify(l))}catch(e){}};
+function btDecode(D){const ix={};D.cols.forEach((c,i)=>ix[c]=i);const ci={};(D.cal||[]).forEach((d,i)=>ci[d]=i);
+  return D.rows.map(r=>{const o={};D.cols.forEach((c,i)=>o[c]=r[i]);o.sym=D.syms[o.s];o.name=(D.names||[])[o.s]||o.sym;o.pattern=D.patterns[o.p];
+    o.dir=(D.pattern_dir||{})[o.pattern]??(/^(bull|pier|morn)/.test(o.pattern)?1:-1);o.kind=o.kind?"break":"test";o.lt=o.lt?"swing":"zone";o.trend=!!o.trend;o.ci=ci[o.date];return o})}
+function btPass(c,P,R){if(c._sc==null)c._sc=suScore(c,R);if(c._sc<P.min_score)return false;
+  if((P.dir==="long"&&c.dir<0)||(P.dir==="short"&&c.dir>0))return false;
+  if(P.kinds[c.kind]===false||P.patterns[c.pattern]===false)return false;if((c.tol||0)>P.tol+1e-9)return false;
+  if(P.min_vol&&(c.vol==null||c.vol<P.min_vol))return false;if(c.kind==="break"&&c.brk<P.brk_atr)return false;
+  if(P.trend==="sma50"){if(c.a50==null)return false;if(!(c.dir>0?(c.a50<0||c.s50===1):(c.a50>0||c.s50===-1)))return false}
+  if(P.no_counter_200&&c.a200!=null&&((c.dir>0&&c.a200>0)||(c.dir<0&&c.a200<0)))return false;return true}
+/* one trade, all prices in basis points of the signal-day close; returns null (no trade), {pending} or a trade */
+function btSim(c,P){const d=c.dir,p=c.path||[],nb=Math.floor(p.length/4),B=k=>({o:p[4*k],h:p[4*k+1],l:p[4*k+2],c:p[4*k+3]});
+  let ek=-1,entry;
+  if(P.entry==="open"){if(nb<1)return{pending:true,trig:null};ek=0;entry=B(0).o}
+  else{const trig=d>0?c.phi:c.plo;for(let k=0;k<Math.min(P.entry_days,nb);k++){const b=B(k);if(b.h==null)continue;if(d>0?b.h>trig:b.l<trig){ek=k;entry=d>0?Math.max(b.o??trig,trig):Math.min(b.o??trig,trig);break}}
+    if(ek<0)return nb<P.entry_days?{pending:true,trig}:null}
+  if(entry==null)return null;
+  const stop0=d>0?Math.min(c.plo,c.zlo)-P.stop_atr*c.atr:Math.max(c.phi,c.zhi)+P.stop_atr*c.atr,risk=d*(entry-stop0);if(!(risk>0))return null;
+  let target=null;if(c.tgt!=null&&d*(c.tgt-entry)>0){if(d*(c.tgt-entry)/risk<P.min_rr)return null;target=c.tgt}else if(P.no_target==="skip")return null;
+  let st=stop0,rem=1,R=0,booked=false,ext=entry,exitK=null,reason="";
+  const last=Math.min(nb,ek+P.max_days);
+  for(let k=ek;k<last;k++){const b=B(k);if(b.h==null)continue;
+    if(d>0?b.l<=st:b.h>=st){const px=k===ek?st:(d>0?Math.min(b.o,st):Math.max(b.o,st));R+=rem*d*(px-entry)/risk;rem=0;exitK=k;reason=booked?(st===entry?"breakeven":"trailing stop"):"stop";break}
+    if(!booked&&P.partial_frac>0&&P.partial_r>0){const lv=entry+d*P.partial_r*risk;if(d>0?b.h>=lv:b.l<=lv){R+=P.partial_frac*P.partial_r;rem-=P.partial_frac;booked=true;if(P.be_after_partial)st=d>0?Math.max(st,entry):Math.min(st,entry)}}
+    if(target!=null&&(d>0?b.h>=target:b.l<=target)){R+=rem*d*(target-entry)/risk;rem=0;exitK=k;reason="target";break}
+    ext=d>0?Math.max(ext,b.h):Math.min(ext,b.l);
+    if(P.trail_atr>0&&(booked||!(P.partial_frac>0&&P.partial_r>0))){const ts=ext-d*P.trail_atr*c.atr;st=d>0?Math.max(st,ts):Math.min(st,ts)}}
+  if(rem>0){if(ek+P.max_days>nb)return{open:true,ek,entry,stop:stop0,target,R:R+rem*d*((B(nb-1).c??entry)-entry)/risk};
+    const k=last-1;R+=rem*d*((B(k).c??entry)-entry)/risk;exitK=k;reason="time stop"}
+  return{ek,xk:exitK,entry,stop:stop0,target,R,reason,risk}}
+function btRun(C,P,R){const tr=[];let pend=0,openN=0;
+  for(const c of C){if(!btPass(c,P,R))continue;const t=btSim(c,P);if(!t)continue;if(t.pending){pend++;continue}if(t.open){openN++;continue}
+    if(c.ci==null)continue;tr.push({c,...t,ei:c.ci+1+t.ek,xi:c.ci+1+t.xk})}
+  tr.sort((a,b)=>a.ei-b.ei||b.c._sc-a.c._sc);
+  // portfolio: at most max_open positions at once, risk_pct of equity per trade
+  const taken=[],live=[];let skipped=0;
+  for(const t of tr){for(let i=live.length-1;i>=0;i--)if(live[i].xi<t.ei)live.splice(i,1);if(live.length>=P.max_open){skipped++;continue}live.push(t);taken.push(t)}
+  const ex=taken.slice().sort((a,b)=>a.xi-b.xi);let eq=100,peak=100,dd=0;const curve=[];
+  ex.forEach(t=>{eq*=1+P.risk_pct/100*t.R;peak=Math.max(peak,eq);dd=Math.max(dd,1-eq/peak);curve.push([t.xi,eq])});
+  const Rs=taken.map(t=>t.R),pos=Rs.filter(x=>x>0),neg=Rs.filter(x=>x<=0),sum=a=>a.reduce((x,y)=>x+y,0);
+  return{trades:taken,n:taken.length,skipped,pend,openN,win:taken.length?pos.length/taken.length:null,avgR:taken.length?sum(Rs)/taken.length:null,
+    pf:neg.length&&sum(neg)<0?sum(pos)/-sum(neg):(pos.length?Infinity:null),dd,ret:eq/100-1,curve,days:taken.length?sum(taken.map(t=>t.xi-t.ei+1))/taken.length:null}}
+async function btData(){if(!S.bt)S.bt=getJSON("data/backtest.json").then(D=>({D,C:btDecode(D)}));return S.bt}
+const fmtR=x=>x==null?"–":(x>0?"+":"")+x.toFixed(2)+"R",fmtP=x=>x==null?"–":(x*100).toFixed(0)+"%";
+async function viewBacktest(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading every setup from the last two years…</div>';
+  let B;try{B=await btData()}catch(e){v.innerHTML='<div class="empty">The backtest appears after the next daily build.</div>';return}
+  if(location.hash.slice(1)!=="backtest")return;
+  const {D,C}=B,R=await suRules(),P=btLoadP();C.forEach(c=>c._sc=suScore(c,R));
+  const sel=(id,lab,opts,val)=>`<label class="btf"><span>${lab}</span><select id="${id}">${opts.map(([v_,l])=>`<option value="${v_}"${String(v_)===String(val)?" selected":""}>${l}</option>`).join("")}</select></label>`;
+  const chk=(id,lab,on)=>`<label class="row" style="gap:6px;flex-wrap:nowrap;align-items:center"><input type="checkbox" id="${id}"${on?" checked":""}>${lab}</label>`;
+  const PN=D.patterns.map(k=>[k,PATNAME[k]||k]);
+  v.innerHTML=`<style>.btf{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}.btf select{font-size:14px}.btg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+   .kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}.kpi div{background:var(--soft);border-radius:8px;padding:8px 10px}.kpi b{display:block;font-size:20px}.kpi span{font-size:12px;color:var(--muted)}
+   .stl td{vertical-align:middle}</style>
+  <div class="grid" style="gap:var(--s4)">
+   <div><h1>Backtest: setups as buy and sell trades</h1><p class="muted" style="margin:4px 0 0">Every setup from the last two years across the Nifty 500, run through your trading rules. A buy needs a bullish pattern at support (or a breakout above resistance); a sell is the mirror image. Each trade only uses what was known at the time. Results are in R, where 1R is the amount risked between entry and stop.</p></div>
+   <details class="card" open id="bt-p"><summary style="cursor:pointer;font-weight:600">Rules <span class="note" id="bt-sum" style="font-weight:400"></span></summary>
+    <h3 style="margin-top:12px">Which setups</h3><div class="btg">
+     ${sel("p-min_score","Minimum setup score",[40,50,60,70,80,90].map(x=>[x,x+"+"]),P.min_score)}
+     ${sel("p-dir","Direction",[["both","Buys and sells"],["long","Buys only"],["short","Sells only"]],P.dir)}
+     ${sel("p-min_vol","Volume on pattern day",[1,1.2,1.5,2,3].map(x=>[x,x+"x 20-day average"]),P.min_vol)}
+     ${sel("p-trend","Trend filter",[["sma50","Close above 50-day avg or it is rising (buys)"],["none","No trend filter"]],P.trend)}
+     ${sel("p-brk_atr","Breakout must close beyond level by",[0,0.25,0.5,1].map(x=>[x,x+" ATR"]),P.brk_atr)}
+     ${sel("p-tol","Touch tolerance",[0.1,0.25,0.5].map(x=>[x,x+" ATR"]),P.tol)}</div>
+    <div class="row" style="flex-wrap:wrap;gap:4px 14px;margin-top:8px">${chk("p-no_counter_200","No buys below the 200-day average (no sells above it)",P.no_counter_200)}${chk("p-k-test","Level tests",P.kinds.test!==false)}${chk("p-k-break","Breakouts",P.kinds.break!==false)}</div>
+    <div class="row" style="flex-wrap:wrap;gap:4px 14px;margin-top:6px">${PN.map(([k,l])=>chk("p-pt-"+k,l,P.patterns[k]!==false)).join("")}</div>
+    <h3 style="margin-top:14px">Entry and exit</h3><div class="btg">
+     ${sel("p-entry","Entry",[["break","When price breaks the pattern high (low for sells)"],["open","Next day's open"]],P.entry)}
+     ${sel("p-entry_days","Cancel if no entry within",[1,2,3,5].map(x=>[x,x+" day"+(x>1?"s":"")]),P.entry_days)}
+     ${sel("p-stop_atr","Stop beyond pattern / level",[0,0.1,0.25,0.5,1].map(x=>[x,x+" ATR"]),P.stop_atr)}
+     ${sel("p-min_rr","Target = next level, only if at least",[0,1,1.5,2,3].map(x=>[x,x?x+"x risk":"any"]),P.min_rr)}
+     ${sel("p-no_target","When there is no level to target",[["allow","Trade it, exit by stops"],["skip","Skip the trade"]],P.no_target)}
+     ${sel("p-partial_r","Book part of the trade at",[[0,"Off"],[1,"1R"],[1.5,"1.5R"],[2,"2R"]],P.partial_r)}
+     ${sel("p-partial_frac","Portion booked",[0.25,0.5,0.75].map(x=>[x,x*100+"%"]),P.partial_frac)}
+     ${sel("p-trail_atr","Trail the rest by",[[0,"No trailing stop"],[1,"1 ATR"],[1.5,"1.5 ATR"],[2,"2 ATR"],[3,"3 ATR"]],P.trail_atr)}
+     ${sel("p-max_days","Exit after",[5,10,15].map(x=>[x,x+" days"]),P.max_days)}</div>
+    <div class="row" style="margin-top:8px">${chk("p-be_after_partial","Move stop to entry after booking part",P.be_after_partial)}</div>
+    <h3 style="margin-top:14px">Sizing</h3><div class="btg">
+     ${sel("p-risk_pct","Risk per trade",[0.25,0.5,1,2].map(x=>[x,x+"% of capital"]),P.risk_pct)}
+     ${sel("p-max_open","Most trades open at once",[1,3,5,10,20].map(x=>[x,x]),P.max_open)}</div>
+    <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button id="bt-reset">Reset to suggested rules</button><span class="note">Setup score uses the weights in your Setups scoring rules. The file holds setups with volume at least ${D.vol_floor||1}x average.</span></div>
+   </details>
+   <div class="card"><h3>Results</h3><div class="kpi" id="bt-k"></div><div class="chart" id="bt-eq" style="height:220px;margin-top:12px"></div><p class="note" id="bt-note"></p></div>
+   <div class="card"><h3>Save and go live</h3>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><input id="st-name" placeholder="Name this strategy" style="flex:1;min-width:180px"><button id="st-save">Save current rules</button><button id="st-dl">Download live strategies for alerts</button></div>
+    <div id="st-l" style="margin-top:10px"></div>
+    <p class="note">Live strategies show today's buy and sell signals at the top of the Setups tab. Auto-promote turns a saved strategy live once its backtest meets your thresholds (checked each time this tab opens). Email and WhatsApp alerts use the strategies file in the project, so download them and replace <span class="mono">config/strategies.json</span> (or ask Claude). Sending stays off until you switch alerts on.</p></div>
+   <div class="card"><h3>Breakdown</h3><div id="bt-g"></div></div>
+   <div class="card"><h3>Trades <span class="note" id="bt-tn"></span></h3><div id="bt-t"></div></div>
+  </div>`;
+  const ids=["min_score","dir","min_vol","trend","brk_atr","tol","entry","entry_days","stop_atr","min_rr","no_target","partial_r","partial_frac","trail_atr","max_days","risk_pct","max_open"];
+  const read=()=>{const o={kinds:{test:$("#p-k-test").checked,break:$("#p-k-break").checked},patterns:{},no_counter_200:$("#p-no_counter_200").checked,be_after_partial:$("#p-be_after_partial").checked};
+    ids.forEach(k=>{const x=$("#p-"+k).value;o[k]=isNaN(+x)?x:+x});D.patterns.forEach(k=>o.patterns[k]=$("#p-pt-"+k).checked);return o};
+  let ec=null,es=null;const eqChart=()=>{if(ec)return;ec=mkChart($("#bt-eq"),{fmt:p=>p.toFixed(0)});es=ec.addAreaSeries({lineColor:PAL[0],topColor:"rgba(47,111,224,.25)",bottomColor:"rgba(47,111,224,0)",lineWidth:2,priceLineVisible:false})};
+  const metrics=(P_)=>btRun(C,P_,R);
+  const draw=()=>{const Pc=read();try{localStorage.setItem(BT_KEY,JSON.stringify(Pc))}catch(e){}
+    $("#bt-sum").textContent=`· score ${Pc.min_score}+ · vol ${Pc.min_vol}x · ${Pc.entry==="break"?"break of pattern":"next open"} · stop ${Pc.stop_atr} ATR · ${Pc.min_rr?Pc.min_rr+"R min":"any target"} · ${Pc.max_days} days`;
+    const M=metrics(Pc);S.btLast={P:Pc,M};
+    const good=M.avgR!=null&&M.avgR>0;
+    $("#bt-k").innerHTML=[["Trades",nf(M.n,0)],["Win rate",fmtP(M.win)],["Average R (expectancy)",`<span style="color:var(${good?"--good":"--bad"})">${fmtR(M.avgR)}</span>`],["Profit factor",M.pf==null?"–":M.pf===Infinity?"∞":M.pf.toFixed(2)],
+      ["Max drawdown",fmtP(M.dd)],["Total return",(M.ret>0?"+":"")+(M.ret*100).toFixed(0)+"%"],["Average days held",M.days==null?"–":M.days.toFixed(1)]].map(([l,x])=>`<div><span>${l}</span><b>${x}</b></div>`).join("");
+    $("#bt-note").textContent=`Equity curve at ${Pc.risk_pct}% risk per trade, at most ${Pc.max_open} open. ${M.skipped?M.skipped+" signals skipped because "+Pc.max_open+" trades were already open. ":""}${M.openN?M.openN+" trades still open and "+M.pend+" waiting for entry are not counted. ":""}Past results are a guide, not a forecast.`;
+    eqChart();const pts={};M.curve.forEach(([xi,eq])=>{const t=D.cal[xi];if(t)pts[t]=eq});es.setData(Object.entries(pts).sort().map(([time,value])=>({time,value})));ec.timeScale().fitContent();
+    // breakdown
+    const g={};M.trades.forEach(t=>{const k=t.c.pattern+"|"+t.c.kind;(g[k]=g[k]||[]).push(t)});
+    const rows=Object.entries(g).map(([k,ts])=>{const Rs=ts.map(t=>t.R);return{c:ts[0].c,n:ts.length,win:Rs.filter(x=>x>0).length/ts.length,avg:Rs.reduce((a,b)=>a+b,0)/ts.length}}).sort((a,b)=>b.avg-a.avg);
+    $("#bt-g").innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Signal</th><th>At level</th><th class="n">Trades</th><th class="n">Win rate</th><th class="n">Average R</th></tr></thead><tbody>${rows.map(r=>`<tr${r.n<20?' style="opacity:.6"':""}><td><span class="pill ${r.c.dir>0?"p-good":"p-bad"}">${r.c.dir>0?"BUY":"SELL"} · ${esc(PATNAME[r.c.pattern])}</span></td><td>${r.c.kind==="test"?(r.c.dir>0?"Held support":"Rejected at resistance"):(r.c.dir>0?"Broke resistance":"Broke support")}</td><td class="n">${r.n}</td><td class="n">${fmtP(r.win)}</td><td class="n"><b style="color:var(${r.avg>0?"--good":"--bad"})">${fmtR(r.avg)}</b></td></tr>`).join("")}</tbody></table></div><p class="note">Faded rows have fewer than 20 trades.</p>`:'<div class="empty">No trades with these rules. Loosen the filters.</div>';
+    // trade list
+    const T=M.trades.slice().sort((a,b)=>b.ei-a.ei).slice(0,S.btMore?150:30),px=(t,bp)=>bp==null?"–":nf(t.c.ref*(1+bp/1e4),t.c.ref<100?2:0);
+    $("#bt-tn").textContent=M.n>T.length?`(latest ${T.length} of ${M.n})`:"";
+    $("#bt-t").innerHTML=T.length?`<div class="tablewrap"><table><thead><tr><th>Entry</th><th>Company</th><th>Signal</th><th class="n hs">Entry ₹</th><th class="n hs">Stop ₹</th><th class="n hs">Target ₹</th><th class="n">Result</th><th class="hs">Exit</th></tr></thead><tbody>${T.map((t,i)=>`<tr data-i="${i}" style="cursor:pointer"><td class="mono">${esc((D.cal[t.ei]||t.c.date).slice(2))}</td><td>${nameCell({name:t.c.name,symbol:t.c.sym})}</td><td><span class="pill ${t.c.dir>0?"p-good":"p-bad"}">${t.c.dir>0?"BUY":"SELL"}</span> <span class="note">${esc(PATSHORT[t.c.pattern])}${t.c.kind==="break"?" ↗":""} · ${t.c._sc}</span></td><td class="n hs">${px(t,t.entry)}</td><td class="n hs">${px(t,t.stop)}</td><td class="n hs">${px(t,t.target)}</td><td class="n"><b style="color:var(${t.R>0?"--good":"--bad"})">${fmtR(t.R)}</b></td><td class="hs note">${esc(t.reason)} · ${t.xi-t.ei+1}d</td></tr>`).join("")}</tbody></table></div>${M.n>T.length&&!S.btMore?'<button id="bt-more" style="margin-top:8px">Show more trades</button>':""}`:"";
+    if($("#bt-more"))$("#bt-more").onclick=()=>{S.btMore=true;draw()};
+    $("#bt-t").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{const t=T[+tr.dataset.i];S.focusSetup={sym:t.c.sym,date:t.c.date};
+      S.setupNav={list:T.map(x=>({sym:x.c.sym,date:x.c.date,sc:x.c._sc,pattern:x.c.pattern,dir:x.c.dir})),i:+tr.dataset.i};goCompany(t.c.sym)});
+    drawSt()};
+  // ---------- saved strategies, live flag, auto-promotion
+  const drawSt=()=>{const L=stList();$("#st-l").innerHTML=L.length?`<div class="tablewrap"><table class="stl"><thead><tr><th>Strategy</th><th class="n">Trades</th><th class="n">Avg R</th><th class="n">PF</th><th>Live</th><th>Auto-promote when</th><th></th></tr></thead><tbody>${L.map((s,i)=>`<tr data-i="${i}"><td><b>${esc(s.name)}</b><div class="note">${esc(s.saved||"")}</div></td><td class="n">${s.m?s.m.n:"–"}</td><td class="n">${s.m?fmtR(s.m.avgR):"–"}</td><td class="n">${s.m&&s.m.pf!=null?(s.m.pf===null?"–":(+s.m.pf).toFixed(2)):"–"}</td>
+      <td><label class="row" style="gap:4px"><input type="checkbox" data-a="live"${s.live?" checked":""}>live</label></td>
+      <td><label class="row" style="gap:4px;flex-wrap:wrap"><input type="checkbox" data-a="auto"${s.auto&&s.auto.on?" checked":""}> ≥<input data-a="mt" type="number" min="0" value="${s.auto?.min_trades??50}" style="width:56px"> trades, avg ≥<input data-a="me" type="number" step="0.05" value="${s.auto?.min_exp??0.2}" style="width:56px">R, PF ≥<input data-a="mp" type="number" step="0.1" value="${s.auto?.min_pf??1.3}" style="width:56px"></label></td>
+      <td><button data-a="load">Load</button> <button data-a="del" aria-label="Delete strategy">✕</button></td></tr>`).join("")}</tbody></table></div>`:'<div class="note">No saved strategies yet.</div>';
+    $("#st-l").querySelectorAll("tr[data-i]").forEach(tr=>{const i=+tr.dataset.i;
+      tr.querySelectorAll("[data-a]").forEach(el=>{const a=el.dataset.a;
+        if(a==="load")el.onclick=()=>{try{localStorage.setItem(BT_KEY,JSON.stringify(stList()[i].params))}catch(e){}viewBacktest()};
+        else if(a==="del")el.onclick=()=>{const L2=stList();if(!confirmDel(L2[i].name))return;L2.splice(i,1);stSave(L2);drawSt()};
+        else el.onchange=()=>{const L2=stList(),s=L2[i];s.auto=s.auto||{};
+          if(a==="live")s.live=el.checked;if(a==="auto")s.auto.on=el.checked;if(a==="mt")s.auto.min_trades=+el.value;if(a==="me")s.auto.min_exp=+el.value;if(a==="mp")s.auto.min_pf=+el.value;
+          stSave(L2);autoPromote();drawSt()}})})};
+  const confirmDel=n=>{const b=$("#st-l");return b.dataset.armed===n?(delete b.dataset.armed,true):(b.dataset.armed=n,$("#bt-note").textContent=`Tap ✕ again to delete "${n}".`,false)};
+  const autoPromote=()=>{const L=stList();let ch=false;L.forEach(s=>{const M=metrics(suMerge(BT_DEF,s.params));s.m={n:M.n,avgR:M.avgR,pf:M.pf===Infinity?99:M.pf,win:M.win};
+      if(s.auto&&s.auto.on&&!s.live&&M.n>=(s.auto.min_trades??50)&&(M.avgR??-9)>=(s.auto.min_exp??0.2)&&(M.pf??0)>=(s.auto.min_pf??1.3)){s.live=true;s.promoted=new Date().toISOString().slice(0,10)}ch=true});
+    if(ch)stSave(L)};
+  $("#st-save").onclick=()=>{const name=($("#st-name").value||"").trim()||`Strategy ${stList().length+1}`,L=stList(),M=S.btLast?.M;
+    const s={name,params:read(),live:false,auto:{on:false,min_trades:50,min_exp:0.2,min_pf:1.3},saved:new Date().toISOString().slice(0,10),m:M?{n:M.n,avgR:M.avgR,pf:M.pf===Infinity?99:M.pf,win:M.win}:null};
+    const j=L.findIndex(x=>x.name===name);if(j>=0)L[j]={...L[j],params:s.params,m:s.m,saved:s.saved};else L.push(s);stSave(L);$("#st-name").value="";drawSt()};
+  $("#st-dl").onclick=()=>{const out={about:"Live strategies for alerts, exported from the Backtest tab.",strategies:stList().filter(s=>s.live).map(s=>({name:s.name,live:true,params:s.params}))};
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,2)+"\n"],{type:"application/json"}));a.download="strategies.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+  $("#bt-reset").onclick=()=>{try{localStorage.removeItem(BT_KEY)}catch(e){}viewBacktest()};
+  let tm;$("#bt-p").addEventListener("change",()=>{clearTimeout(tm);tm=setTimeout(draw,80)});
+  autoPromote();draw();
+}
+/* live signals from live strategies, for the Setups tab */
+async function liveSignals(){const L=stList().filter(s=>s.live);if(!L.length)return null;
+  let D;try{D=await (S.sigR||(S.sigR=getJSON("data/signals_recent.json")))}catch(e){return null}
+  const C=btDecode({...D,names:[],pattern_dir:null}),R=await suRules(),out=[];
+  L.forEach(s=>{const P=suMerge(BT_DEF,s.params),days=D.cal.slice(-(P.entry==="open"?1:P.entry_days));
+    C.forEach(c=>{if(!days.includes(c.date)||!btPass(c,P,R))return;const t=btSim(c,P);if(!t)return;
+      const st=t.pending?"waiting":t.open?"entered":null;if(!st)return;out.push({s,c,t,st})})});
+  return out.sort((a,b)=>b.c.date.localeCompare(a.c.date)||b.c._sc-a.c._sc)}
+
+// ---------------------------------------------------------------- Research: what has worked, for which stocks (weekly)
+async function viewResearch(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading the weekly research…</div>';
+  let R,L=null;try{R=await getJSON("data/research.json")}catch(e){v.innerHTML='<div class="empty">The research appears after the first weekly run (Saturday morning).</div>';return}
+  try{L=await getJSON("data/research_live.json")}catch(e){}
+  if(location.hash.slice(1)!=="research")return;
+  const r2=x=>x==null?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%";
+  const rng=(a,f=r2)=>a&&a.length?`<span class="note">${f(a[0])} to ${f(a[1])}</span>`:"";
+  const tone=x=>x==null?"":x>0.05?"color:var(--good)":x<-0.05?"color:var(--bad)":"";
+  const VER={holds:["p-good","Holds up","Positive in the older 70% and still positive in the newest 30%"],weaker:["p-warn","Weaker","Still positive out of sample, but less than half its in-sample result"],degrades:["p-bad","Degrades","Positive in sample, zero or negative out of sample: likely overfit"],thin:["p-neutral","Too few","Positive in sample, too few out-of-sample trades to judge"],negative:["p-neutral","Negative","Not positive even in sample"]};
+  const vp=k=>{const x=VER[k];return x?`<span class="pill ${x[0]}" title="${esc(x[2])}">${x[1]}</span>`:""};
+  const st=(s,full)=>!s||!s.n?'<span class="note">none</span>':`<b style="${tone(s.avg)}">${r2(s.avg)}R</b> <span class="note">n=${s.n} · win ${pc(s.win)}${full&&s.pf!=null?" · PF "+nf(s.pf,2):""}</span>`;
+  const O=R.overall,E=R.eval,thin=(R.test_n||0)<300;
+  const lmap={};(R.leaves||[]).forEach(l=>lmap[l.path]=l);
+  const lab=sp=>{const f=(R.features[sp[1]]||{}).label||sp[1];return sp[0]==="num"?[`${f} < ${sp[2]}`,`${f} ≥ ${sp[2]}`]:[`${f}: ${sp[2]}`,`${f}: not ${sp[2]}`]};
+  const node=(n,path,txt)=>{const lf=lmap[path];const head=`<span>${esc(txt)}</span> <span class="note">· ${n.n} trades · avg <b style="${tone(n.avg)}">${r2(n.avg)}R</b> · win ${pc(n.win)}</span>`;
+    if(!n.split)return `<li class="rt-leaf"><div>${head}</div>${lf?`<div class="rt-lf">${vp(lf.verdict)} in sample ${st(lf.train)} · out of sample ${st(lf.test)} · <b>p(win) ${pc(lf.prob)}</b>, expected ${r2(lf.exp_r)}R</div>`:""}</li>`;
+    const [a,b]=lab(n.split);return `<li><details${path.length<2?" open":""}><summary>${head}</summary><ul>${node(n.left,path+"L",a)}${node(n.right,path+"R",b)}</ul></details></li>`};
+  const pv=L&&L.predictions||[];
+  const hint=p=>p.alert?'<span class="pill p-good">Consider</span>':(p.exp_r>0&&["holds","weaker"].includes(p.verdict)?'<span class="pill p-warn">Marginal</span>':'<span class="pill p-neutral">Skip</span>');
+  const FV=R.factor_value||[];
+  v.innerHTML=`<style>.rt ul{list-style:none;margin:0;padding-left:16px;border-left:1px solid var(--line)}.rt>ul{padding-left:0;border:0}.rt li{margin:6px 0}.rt summary{cursor:pointer}.rt-lf{margin:4px 0 0 2px;font-size:13px}.rt-leaf>div:first-child::before{content:"▸ ";color:var(--muted)}
+   .rcmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.rcmp>div{background:var(--soft);border-radius:8px;padding:10px}.rcmp h4{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600}.rcmp p{margin:3px 0;font-size:14px}</style>
+  <div class="grid" style="gap:var(--s4)">
+   <div><h1>Research: what has worked, for which stocks</h1><p class="muted" style="margin:4px 0 0">Every setup across the Nifty 500 since ${esc(R.period[0])}, run through one fixed trade rule and fed to a decision tree that looks for the combination of factors (setup, trend, room to the next level, sector, size and more) that separates good trades from bad. Refit every Saturday. Fitted on the older 70% of dates (to ${esc(R.split_date)}), then tested untouched on the newest 30%. <a href="#explore">Open the factor explorer</a> to slice the trades by any combination of factors yourself.</p>
+    <p class="note">Updated ${esc(R.run)} · ${R.labelled.toLocaleString("en-IN")} trades from ${R.stocks_n||"–"} stocks (${R.long_stocks||0} with 10-year history) · ${esc(R.price_basis||"")}.</p></div>
+   ${thin?`<div class="banner">Evidence is thin: only ${R.test_n} trades in the test period. Treat every number below as a rough guide.</div>`:""}
+   <div class="card"><h3>Overfitting check (70:30)</h3><div class="rcmp">
+     <div><h4>All setups</h4><p>In sample: ${st(O.train,1)}</p><p>Out of sample: ${st(O.test,1)}</p></div>
+     <div><h4>Only the conditions the tree liked</h4><p>In sample: ${st(E.picked_train,1)}</p><p>Out of sample: ${st(E.picked,1)}</p></div>
+     <div><h4>Win probability accuracy (Brier, lower is better)</h4><p>Model ${E.brier!=null?nf(E.brier,4):"–"} vs flat base rate ${E.brier_base!=null?nf(E.brier_base,4):"–"}</p><p class="note">${E.brier!=null&&E.brier<E.brier_base?"The model's probabilities beat a flat guess on unseen dates.":"The model's probabilities do not beat a flat guess on unseen dates: use them with caution."}</p></div></div>
+     <p class="note" style="margin-top:8px">If "in sample" is much better than "out of sample", the pattern was luck in the old data. Conditions below carry a verdict: ${Object.keys(VER).map(vp).join(" ")}</p></div>
+   <div class="card"><h3>Recent setups with model odds</h3>${pv.length?`<div class="tablewrap"><table><thead><tr><th>Setup</th><th>Company</th><th class="hs">Day</th><th class="n">p(win)</th><th class="n">Expected</th><th class="hs">Out of sample</th><th>Verdict</th><th>Hint</th></tr></thead><tbody>${pv.map((p,i)=>`<tr data-i="${i}" style="cursor:pointer"><td><span class="pill ${p.dir>0?"p-good":"p-bad"}">${p.dir>0?"BUY":"SELL"}</span> <span class="note">${esc(PATSHORT[p.pattern]||p.pattern)} · ${p.score}</span></td><td><b class="mono">${esc(p.symbol)}</b></td><td class="mono hs">${esc(p.date.slice(5))}</td><td class="n"><b>${pc(p.prob)}</b><br>${rng(p.prob_ci,pc)}</td><td class="n"><b style="${tone(p.exp_r)}">${r2(p.exp_r)}R</b><br>${rng(p.exp_ci)}</td><td class="hs">${st(p.test)}</td><td>${vp(p.verdict)}</td><td>${hint(p)}</td></tr>`).join("")}</tbody></table></div><p class="note">p(win) is the share of similar past trades that ended positive, pulled toward the overall rate when the group is small (range: 95%). Expected is the average result in R. "Consider" means it meets your model-alert thresholds (expected ≥ ${r2(R.config.alert.min_exp_r)}R, p(win) ≥ ${pc(R.config.alert.min_prob)}, and the condition held up out of sample). Tap a row for the chart.</p>`:'<div class="note">No recent setups yet, or the daily build has not applied this week\'s model.</div>'}</div>
+   <div class="card"><h3>Best conditions</h3><div class="tablewrap"><table><thead><tr><th>When</th><th>In sample (older 70%)</th><th>Out of sample (newest 30%)</th><th class="n">p(win)</th><th class="n">Expected</th><th>Verdict</th></tr></thead><tbody>${R.leaves.map(l=>`<tr><td style="min-width:220px">${l.rules.map(esc).join("<br>")||"All setups"}<div class="note">${(l.dirs||[]).join(" / ")}</div></td><td>${st(l.train)}<br>${rng(l.train.avg_ci)}</td><td>${st(l.test)}<br>${rng(l.test.avg_ci)}</td><td class="n">${pc(l.prob)}<br>${rng(l.prob_ci,pc)}</td><td class="n" style="${tone(l.exp_r)}">${r2(l.exp_r)}R</td><td>${vp(l.verdict)}</td></tr>`).join("")}</tbody></table></div>
+     <p class="note">Each row is a leaf of the tree: a group of at least ${R.config.min_leaf} past trades. Sorted by the out-of-sample result.</p></div>
+   <div class="card"><h3>Decision tree</h3><div class="rt"><ul>${node(R.tree,"","All setups")}</ul></div><p class="note">Splits were chosen on the training dates only. Tap a branch to open it.</p></div>
+   <div class="card"><h3>Which factors add value</h3><div class="tablewrap"><table><thead><tr><th>Factor</th><th class="n">Value</th><th class="n hs">Picked trades out of sample, with / without</th><th>In tree</th></tr></thead><tbody>${FV.map(f=>`<tr><td>${esc(f.label)}</td><td class="n" style="${tone((f.brier_change||0)/5)}">${f.brier_change==null?"–":(f.brier_change>0?"+":"")+nf(f.brier_change,2)}</td><td class="n hs">${r2(f.picked_avg_with)}R / ${r2(f.picked_avg_without)}R <span class="note">n=${f.picked_n_without??"–"}</span></td><td>${f.used?"yes":'<span class="note">no</span>'}</td></tr>`).join("")}</tbody></table></div>
+     <p class="note">Value: how much worse the out-of-sample probability error gets (×1000) when the factor is removed and the tree refit. Positive means the factor helps; near zero means it adds nothing; negative means the tree is better off without it. New factors you add show up here the next Saturday.</p></div>
+   <div class="card"><h3>One factor at a time</h3><label class="btf" style="max-width:320px"><span>Factor</span><select id="rs-f">${(R.single||[]).map((s,i)=>`<option value="${i}">${esc(s.label)}</option>`).join("")}</select></label><div id="rs-s" style="margin-top:10px"></div></div>
+   <div class="card"><h3>By stock and sector</h3><div class="row" style="gap:8px;flex-wrap:wrap"><input id="rs-q" placeholder="Filter symbol or sector" style="max-width:220px"><select id="rs-v"><option value="">All verdicts</option>${Object.entries(VER).map(([k,x])=>`<option value="${k}">${x[1]}</option>`).join("")}</select></div>
+     <div id="rs-sec" style="margin-top:10px"></div><div id="rs-st" style="margin-top:10px"></div>
+     <p class="note">Per-stock numbers are small samples: a stock's own history is a hint, the pooled conditions above are the evidence. "Best condition" is picked on the older dates and its result on the newest dates shown beside it.</p></div>
+   <div class="card"><h3>How the trades are scored</h3><p class="note">Entry when price breaks the pattern high (low for sells) within ${R.label_rule.entry_days} days; stop ${R.label_rule.stop_atr} ATR beyond the pattern or level; half booked at ${R.label_rule.partial_r}R with the stop moved to entry; the rest trailed by ${R.label_rule.trail_atr} ATR; exit after ${R.label_rule.max_days} days. Results include dividends. To test a new parameter, add it to the research factors (ask Claude) and it is scored here from the next weekly run. Settings: <span class="mono">config/research.json</span>.</p></div>
+  </div>`;
+  $("#view").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{const p=pv[+tr.dataset.i];S.focusSetup={sym:p.symbol,date:p.date};
+    S.setupNav={list:pv.map(y=>({sym:y.symbol,date:y.date,sc:y.score,pattern:y.pattern,dir:y.dir})),i:+tr.dataset.i};goCompany(p.symbol)});
+  const single=()=>{const s=(R.single||[])[+$("#rs-f").value];if(!s){$("#rs-s").innerHTML="";return}
+    $("#rs-s").innerHTML=`<div class="tablewrap"><table><thead><tr><th>Value</th><th class="n">Trades</th><th class="n">Avg</th><th class="n hs">95% range</th><th class="n">Win</th><th class="n hs">PF</th></tr></thead><tbody>${s.bands.map(b=>`<tr${b.n<100?' class="note"':""}><td>${esc(b.value)}</td><td class="n">${b.n}</td><td class="n" style="${tone(b.avg)}">${r2(b.avg)}R</td><td class="n hs">${rng(b.avg_ci)}</td><td class="n">${pc(b.win)}</td><td class="n hs">${b.pf==null?"–":nf(b.pf,2)}</td></tr>`).join("")}</tbody></table></div><p class="note">All dates, no split. Grey rows have under 100 trades.</p>`};
+  $("#rs-f").onchange=single;single();
+  const SA=R.stock_attr||{};
+  const stocks=()=>{const q=$("#rs-q").value.trim().toUpperCase(),vf=$("#rs-v").value;
+    const rows=(R.stocks||[]).slice().sort((a,b)=>(b.symbol===S.lastCompany)-(a.symbol===S.lastCompany)).filter(s=>(!q||s.symbol.includes(q)||((SA[s.symbol]||{}).sector||"").toUpperCase().includes(q))&&(!vf||s.verdict===vf));
+    const sec={};(R.stocks||[]).forEach(s=>{const k=(SA[s.symbol]||{}).sector||"Other";const o=sec[k]||(sec[k]={n:0,sum:0,trn:0,trs:0,ten:0,tes:0});o.n+=s.n;o.sum+=s.n*s.avg;if(s.train&&s.train.n){o.trn+=s.train.n;o.trs+=s.train.n*s.train.avg}if(s.test&&s.test.n){o.ten+=s.test.n;o.tes+=s.test.n*s.test.avg}});
+    const SE=Object.entries(sec).map(([k,o])=>({k,n:o.n,avg:o.sum/o.n,tr:o.trn?o.trs/o.trn:null,te:o.ten?o.tes/o.ten:null,ten:o.ten})).sort((a,b)=>(b.te??-9)-(a.te??-9));
+    $("#rs-sec").innerHTML=`<details><summary style="cursor:pointer;font-weight:600">Sectors (${SE.length})</summary><div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Sector</th><th class="n">Trades</th><th class="n">In sample</th><th class="n">Out of sample</th></tr></thead><tbody>${SE.map(s=>`<tr><td>${esc(s.k)}</td><td class="n">${s.n}</td><td class="n" style="${tone(s.tr)}">${r2(s.tr)}R</td><td class="n" style="${tone(s.te)}">${r2(s.te)}R <span class="note">n=${s.ten}</span></td></tr>`).join("")}</tbody></table></div></details>`;
+    $("#rs-st").innerHTML=`<div class="tablewrap"><table><thead><tr><th>Stock</th><th class="n">Trades</th><th>In sample</th><th>Out of sample</th><th>Verdict</th><th class="hs">Buys / sells</th><th class="hs">Best condition (older dates) → newest dates</th></tr></thead><tbody>${rows.slice(0,150).map(s=>`<tr data-s="${esc(s.symbol)}" style="cursor:pointer"><td><b class="mono">${esc(s.symbol)}</b><div class="note">${esc((SA[s.symbol]||{}).sector||"")}</div></td><td class="n">${s.n}</td><td>${st(s.train)}</td><td>${st(s.test)}</td><td>${vp(s.verdict)}</td><td class="hs">${st(s.buy)}<br>${st(s.sell)}</td><td class="hs note" style="min-width:200px">${(s.best_leaf_rules||[]).map(esc).join(" · ")||"–"}${s.best_leaf_n?` <br>older: ${r2(s.best_leaf_avg)}R n=${s.best_leaf_n} → newest: ${s.best_leaf_test&&s.best_leaf_test.n?r2(s.best_leaf_test.avg)+"R n="+s.best_leaf_test.n:"none"}`:""}</td></tr>`).join("")}</tbody></table></div>${rows.length>150?`<p class="note">Showing 150 of ${rows.length}. Filter to narrow.</p>`:""}`;
+    $("#rs-st").querySelectorAll("tr[data-s]").forEach(tr=>tr.onclick=()=>goCompany(tr.dataset.s))};
+  $("#rs-q").oninput=stocks;$("#rs-v").onchange=stocks;stocks();
+}
+// ---------------------------------------------------------------- Factor explorer: slice every setup by any combination of factors
+const EX_KEY="his.explorer";
+const EX_DEF={scope:"stock",sym:null,vars:["dir","trend50","room"],bins:{},minN:5,thr:0.1,rule:null,depth3:false};
+const EX_BINS={score:"40,50,60,70",room:"0.5,1,1.5,2,3",volume:"0.75,1,1.5,2",level_strength:"auto:4",pattern_quality:"0.5,0.7,0.9",
+  touch:"0.1,0.2",breakout_dist:"0.25,0.5,1",volatility:"auto:4",liquidity:"auto:4"};
+const EX_RULE={entry_days:3,stop_atr:0.25,partial_r:1,trail_atr:2,max_days:15,use_target:false};
+const exLoad=()=>{try{const o=JSON.parse(localStorage.getItem(EX_KEY)||"{}");return {...EX_DEF,...o,bins:{...(o.bins||{})}}}catch(e){return {...EX_DEF}}};
+const exSave=st=>{try{localStorage.setItem(EX_KEY,JSON.stringify(st))}catch(e){}};
+S.exCache={};
+async function exFile(name){if(!S.exCache[name])S.exCache[name]=getJSON("data/explore/"+name+".json").catch(e=>{delete S.exCache[name];throw e});return S.exCache[name]}
+/* bins: "1,2,3" edges, "step:0.1" or "auto:4" (equal-count bands) */
+function exEdges(spec,vals){spec=String(spec||"auto:4").trim();const v=vals.filter(x=>x!=null&&isFinite(x)).sort((a,b)=>a-b);if(!v.length)return[];
+  let m;if((m=spec.match(/^auto:?(\d+)?$/i))){const k=Math.max(2,Math.min(12,+(m[1]||4)));const e=[];for(let i=1;i<k;i++)e.push(+v[Math.floor(i*v.length/k)].toPrecision(3));return [...new Set(e)]}
+  if((m=spec.match(/^step:?\s*([\d.]+)$/i))){const s=+m[1];if(!(s>0))return[];const lo=Math.ceil(v[0]/s)*s,hi=v[v.length-1],e=[];for(let x=lo;x<=hi&&e.length<40;x+=s)e.push(+x.toFixed(6));return e}
+  return spec.split(/[ ,;]+/).map(Number).filter(isFinite).sort((a,b)=>a-b)}
+const exFmt=x=>Math.abs(x)>=100?nf(x,0):(+x.toPrecision(3)).toString();
+function exBinner(f,meta,vals,spec){const F=meta.features[f];
+  if(F.kind==="cat"){const cats=F.cats||[];const ix=new Map(cats.map((c,i)=>[c,i]));return {labels:[...cats,"n/a"],code:v=>v==null?cats.length:(ix.has(String(v))?ix.get(String(v)):cats.length)}}
+  const e=exEdges(spec,vals);const labels=e.length?[`< ${exFmt(e[0])}`,...e.slice(1).map((x,i)=>`${exFmt(e[i])} to ${exFmt(x)}`),`≥ ${exFmt(e[e.length-1])}`,"n/a"]:["all","n/a"];
+  return {labels,edges:e,code:v=>{if(v==null)return labels.length-1;let i=0;while(i<e.length&&v>=e[i])i++;return i}}}
+function exStats(rs){const n=rs.length;if(!n)return{n:0};let s=0,w=0,ss=0,pos=0,neg=0;for(const r of rs){s+=r;ss+=r*r;if(r>0){w++;pos+=r}else neg-=r}
+  const m=s/n,sd=n>1?Math.sqrt(Math.max(0,(ss-n*m*m)/(n-1))):0,se=sd/Math.sqrt(n),p=w/n,z=1.96,den=1+z*z/n,c=(p+z*z/(2*n))/den,h=z*Math.sqrt(p*(1-p)/n+z*z/(4*n*n))/den;
+  return {n,avg:m,win:p,ci:[m-z*se,m+z*se],wci:[c-h,c+h],pf:neg>0?pos/neg:null}}
+function exVerdict(tr,te,min=5){if(!tr.n||tr.avg<=0)return"negative";if(!te.n||te.n<min)return"thin";if(te.avg<=0)return"degrades";if(te.avg<0.5*tr.avg)return"weaker";return"holds"}
+async function viewExplore(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
+  let M;try{M=await exFile("_meta")}catch(e){v.innerHTML='<div class="empty">The explorer appears after the next weekly research run.</div>';return}
+  if(location.hash.slice(1)!=="explore")return;
+  const st=exLoad(),F=M.features,FK=Object.keys(F),SL=M.stocks;st.k=st.k||2;st.metric=st.metric||"avg";if(st.minN<10)st.minN=st.scope==="all"?100:10;
+  if(S.lastCompany&&SL.some(s=>s.symbol===S.lastCompany))st.sym=S.lastCompany;
+  if(!st.sym||!SL.some(s=>s.symbol===st.sym)){const c=SL.filter(s=>s.n>=80&&s.vol!=null).sort((a,b)=>b.vol-a.vol);st.sym=(c[0]||SL[0]||{}).symbol}
+  const rule={...EX_RULE,...(st.rule||{})};
+  const r2=x=>x==null||!isFinite(x)?"–":(x>0?"+":"")+nf(x,2),pc=x=>x==null?"–":Math.round(x*100)+"%";
+  const VER={holds:["p-good","Holds up"],weaker:["p-warn","Weaker"],degrades:["p-bad","Stopped working"],thin:["p-neutral","Too few to tell"],negative:["p-neutral","Never worked"]};
+  const vp=k=>VER[k]?`<span class="pill ${VER[k][0]}">${VER[k][1]}</span>`:"";
+  const opt=(a,val)=>a.map(([x,l])=>`<option value="${esc(String(x))}"${String(x)===String(val)?" selected":""}>${esc(l)}</option>`).join("");
+  v.innerHTML=`<style>.exbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.exbar select{font-size:14px;max-width:100%}
+   .exwrap{position:relative}#ex-map{width:100%;display:block;touch-action:manipulation;cursor:crosshair}
+   .extip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+   .exsel{background:var(--soft);border-radius:10px;padding:12px}.exsel .rules{font-size:15px;line-height:1.5}
+   .exnum{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}.exnum div{display:flex;flex-direction:column}.exnum b{font-family:var(--f-mono);font-size:18px}.exnum span{font-size:12px;color:var(--muted)}
+   .exsplit{display:grid;grid-template-columns:minmax(80px,auto) 1fr 64px;gap:4px 8px;align-items:center;font-size:13px;margin-top:8px}.exsplit .bar{height:14px;border-radius:3px}
+   .extop{display:flex;flex-direction:column;gap:4px}.extop button{display:flex;justify-content:space-between;gap:8px;text-align:left;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:13px}
+   .exv{display:flex;flex-direction:column;gap:6px}.exv>div{display:grid;grid-template-columns:1fr minmax(100px,160px);gap:8px;align-items:center}.exv input{font-size:13px;width:100%}</style>
+  <div class="grid" style="gap:var(--s3)">
+   <div class="exbar"><h1 style="margin:0 8px 0 0">Explorer</h1>
+    <select id="ex-scope" aria-label="Trades from">${opt([["stock","One stock"],["sector","Its sector"],["all","All stocks"]],st.scope)}</select>
+    <select id="ex-sym" aria-label="Stock"${st.scope==="all"?" hidden":""}>${SL.map(s=>`<option value="${esc(s.symbol)}"${s.symbol===st.sym?" selected":""}>${esc(s.symbol)}</option>`).join("")}</select>
+    <select id="ex-k" aria-label="Factors per zone">${opt([[1,"1 factor"],[2,"2 factors"],[3,"3 factors"]],st.k)}</select>
+    <select id="ex-min" aria-label="Fewest trades">${opt([5,10,20,30,50,100,200,500].map(x=>[x,x+"+ trades"]),st.minN)}</select>
+    <select id="ex-metric" aria-label="Measure">${opt([["avg","Average R"],["pf","Profit factor"]],st.metric)}</select></div>
+   <div class="card" style="padding:var(--s3)"><div class="exwrap"><canvas id="ex-map" height="420"></canvas><div class="extip" id="ex-tip" hidden></div></div>
+    <div class="note" id="ex-cap" style="margin-top:4px"></div></div>
+   <div id="ex-sel"></div>
+   <details class="card"><summary style="cursor:pointer;font-weight:600">Steps and trade rule</summary>
+    <div class="exv" id="ex-vars" style="margin-top:10px"></div>
+    <div class="btg" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
+     <label class="btf"><span>Enter within</span><select id="r-entry_days">${opt([1,2,3,5].map(x=>[x,x+" day"+(x>1?"s":"")]),rule.entry_days)}</select></label>
+     <label class="btf"><span>Stop beyond level</span><select id="r-stop_atr">${opt([0,0.1,0.25,0.5,1].map(x=>[x,x+" ATR"]),rule.stop_atr)}</select></label>
+     <label class="btf"><span>Book half at</span><select id="r-partial_r">${opt([[0,"Off"],[1,"1R"],[1.5,"1.5R"],[2,"2R"]],rule.partial_r)}</select></label>
+     <label class="btf"><span>Trail by</span><select id="r-trail_atr">${opt([[0,"Off"],[1,"1 ATR"],[1.5,"1.5 ATR"],[2,"2 ATR"],[3,"3 ATR"]],rule.trail_atr)}</select></label>
+     <label class="btf"><span>Exit after</span><select id="r-max_days">${opt([5,10,15].map(x=>[x,x+" days"]),rule.max_days)}</select></label>
+     <label class="btf"><span>Exit at next level</span><select id="r-use_target">${opt([["false","No"],["true","Yes"]],String(rule.use_target))}</select></label></div>
+    <p class="note" style="margin:8px 0 0">Steps: <span class="mono">1, 1.5, 2</span> · <span class="mono">step:0.1</span> · <span class="mono">auto:5</span>. A changed rule recalculates each trade (one stock or sector only).</p></details>
+  </div>`;
+  let T=[],Z=[],sel=null,ruleStd=true,B={},view=null;
+  const save=()=>{st.rule=ruleStd?null:rule;exSave(st)};
+  const isTr=t=>t.date<M.split;
+  async function loadTrades(){
+    $("#ex-cap").textContent="Loading trades…";$("#ex-sym").hidden=st.scope==="all";
+    const rows=[],cat=(f,x)=>x==null?null:(F[f].kind==="cat"?(F[f].cats||[])[x]:x);
+    ruleStd=Object.keys(EX_RULE).every(k=>String(rule[k])===String(EX_RULE[k]));
+    const add=d=>{const P={...BT_DEF,entry:"break",entry_days:+rule.entry_days,stop_atr:+rule.stop_atr,min_rr:0,no_target:"allow",partial_r:+rule.partial_r,partial_frac:0.5,be_after_partial:true,trail_atr:+rule.trail_atr,max_days:+rule.max_days};
+      for(let i=0;i<d.dates.length;i++){let R=d.R[i];
+        if(!ruleStd){const c={dir:d.sim.dir[i],path:d.sim.path[i]};for(const k of ["atr","phi","plo","zlo","zhi","tgt"])c[k]=d.sim[k][i];if(!rule.use_target||rule.use_target==="false")c.tgt=null;const t=btSim(c,P);R=t&&!t.pending&&!t.open?t.R:null}
+        if(R==null)continue;const x={};for(const f of FK)x[f]=cat(f,d.x[f][i]);rows.push({date:d.dates[i],sym:d.symbol,R,x})}};
+    if(st.scope==="all"){const A=await exFile("_all");for(let i=0;i<A.R.length;i++){const x={};for(const f of FK)x[f]=cat(f,A.x[f][i]);rows.push({date:A.dates[i],sym:A.syms[A.s[i]],R:A.R[i],x})}}
+    else{const me=await exFile(st.sym.replace("&","_"));if(st.scope==="sector"){const sec=(SL.find(s=>s.symbol===st.sym)||{}).sector;
+        const fs=await Promise.all(SL.filter(s=>s.sector===sec).map(s=>exFile(s.symbol.replace("&","_")).catch(()=>null)));fs.forEach(d=>d&&add(d))}else add(me)}
+    T=rows;sel=null;compute()}
+  function compute(){
+    B={};for(const f of FK)B[f]=exBinner(f,M,T.map(t=>t.x[f]),st.bins[f]??EX_BINS[f]);
+    const fs=FK.filter(f=>new Set(T.map(t=>B[f].code(t.x[f]))).size>1),n=T.length,codes={},k=+st.k;
+    for(const f of fs){const a=new Uint8Array(n);for(let i=0;i<n;i++)a[i]=Math.min(255,B[f].code(T[i].x[f]));codes[f]=a}
+    const R=Float64Array.from(T.map(t=>t.R)),tr=Uint8Array.from(T.map(t=>isTr(t)?1:0)),combos=[];
+    for(let a=0;a<fs.length;a++){if(k===1){combos.push([fs[a]]);continue}for(let b=a+1;b<fs.length;b++){if(k===2)combos.push([fs[a],fs[b]]);else for(let c=b+1;c<fs.length;c++)combos.push([fs[a],fs[b],fs[c]])}}
+    Z=[];for(const cb of combos){const L=cb.map(f=>B[f].labels.length),cs=cb.map(f=>codes[f]),m=new Map();
+      for(let i=0;i<n;i++){let key=0,skip=false;for(let j=0;j<cb.length;j++){const c=cs[j][i];if(c===L[j]-1){skip=true;break}key=key*L[j]+c}if(skip)continue;
+        let o=m.get(key);if(!o){o=[0,0,0,0,0,0,0,0];m.set(key,o)}const r=R[i];if(tr[i]){o[0]++;o[1]+=r;if(r>0)o[2]+=r;else o[3]-=r}else{o[4]++;o[5]+=r;if(r>0)o[6]+=r;else o[7]-=r}}
+      for(const [key,o] of m){if(o[0]+o[4]<st.minN)continue;let r=key;const parts=[];for(let j=cb.length-1;j>=0;j--){parts.unshift(r%L[j]);r=Math.floor(r/L[j])}
+        const pf=(p,q)=>q>0?p/q:(p>0?9:null);
+        Z.push({cb,parts,tn:o[0],ta:o[0]?o[1]/o[0]:null,tp:pf(o[2],o[3]),en:o[4],ea:o[4]?o[5]/o[4]:null,ep:pf(o[6],o[7]),n:o[0]+o[4],avg:(o[1]+o[5])/(o[0]+o[4]),pf:pf(o[2]+o[6],o[3]+o[7])})}}
+    Z.forEach(z=>z.v=exVerdict({n:z.tn,avg:z.ta},{n:z.en,avg:z.ea},Math.max(5,Math.round(st.minN/4))));
+    draw()}
+  const zname=z=>z.cb.map((f,j)=>`${F[f].label} ${B[f].labels[z.parts[j]]}`).join(" · ");
+  function draw(panel=true){const cv=$("#ex-map");if(!cv)return;const W=cv.parentElement.clientWidth,H=Math.min(460,Math.max(300,Math.round(W*0.62))),dpr=window.devicePixelRatio||1;
+    cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);
+    const css=getComputedStyle(document.documentElement),C=k=>css.getPropertyValue(k).trim();
+    const pfm=st.metric==="pf";let lim;
+    if(pfm)lim=[0.25,4];else{const vals=[];Z.forEach(z=>{if(z.en>0){vals.push(Math.abs(z.ta),Math.abs(z.ea))}});vals.sort((a,b)=>a-b);const q=vals.length?vals[Math.floor(vals.length*0.98)]:0.5;const m=Math.max(0.25,Math.ceil(q*4)/4);lim=[-m,m]}
+    const tx=x=>pfm?Math.log(Math.max(lim[0],Math.min(lim[1],x||lim[0]))):Math.max(lim[0],Math.min(lim[1],x));
+    const L0=58,R0=10,T0=12,B0=34,X=x=>L0+(tx(x)-tx(lim[0]))/(tx(lim[1])-tx(lim[0]))*(W-L0-R0),Y=y=>H-B0-(tx(y)-tx(lim[0]))/(tx(lim[1])-tx(lim[0]))*(H-T0-B0);
+    const zero=pfm?1:0;g.clearRect(0,0,W,H);
+    // quadrant shading: works before and after
+    g.fillStyle=C("--good-bg");g.globalAlpha=0.6;g.fillRect(X(zero),T0,W-R0-X(zero),Y(zero)-T0);g.globalAlpha=1;
+    g.strokeStyle=C("--line");g.lineWidth=1;g.beginPath();g.moveTo(X(zero),T0);g.lineTo(X(zero),H-B0);g.moveTo(L0,Y(zero));g.lineTo(W-R0,Y(zero));g.stroke();
+    g.setLineDash([3,4]);g.beginPath();g.moveTo(X(lim[0]),Y(lim[0]));g.lineTo(X(lim[1]),Y(lim[1]));g.stroke();g.setLineDash([]);
+    g.fillStyle=C("--muted");g.font="11px system-ui,sans-serif";g.textAlign="center";
+    (pfm?[0.25,0.5,1,2,4]:[lim[0],lim[0]/2,0,lim[1]/2,lim[1]].map(t=>+t.toFixed(3))).forEach((t,ti,arr)=>{const lb=pfm?t+"":((t>0?"+":"")+(+t.toFixed(2))+"R");g.textAlign=ti===arr.length-1?"right":ti===0?"left":"center";g.fillText(lb,X(t)+(ti===arr.length-1?2:0),H-B0+14);t=+t;g.textAlign="right";g.fillText(lb,L0-5,Y(t)+4);g.textAlign="center"});
+    g.fillText("Before "+M.split.slice(0,4)+" (older 70%) →",(L0+W-R0)/2,H-4);
+    g.save();g.translate(10,(T0+H-B0)/2);g.rotate(-Math.PI/2);g.fillText("Since then (newest 30%) →",0,0);g.restore();
+    g.textAlign="right";g.fillStyle=C("--good");g.font="600 11px system-ui,sans-serif";g.fillText("Worked before and after",W-R0-4,T0+12);
+    g.textAlign="right";g.fillStyle=C("--bad");g.fillText("Stopped working",W-R0-4,H-B0-6);
+    const maxN=Math.max(1,...Z.map(z=>z.n)),pts=[];
+    const sorted=Z.filter(z=>z.en>0).sort((a,b)=>b.n-a.n);
+    for(const z of sorted){const xv=pfm?z.tp:z.ta,yv=pfm?z.ep:z.ea;if(xv==null||yv==null)continue;const x=X(xv),y=Y(yv),r=2.5+9*Math.sqrt(z.n/maxN);
+      const base=pfm?1:0,b4=xv>base,af=yv>base;
+      g.beginPath();g.arc(x,y,r,0,7);g.fillStyle=b4&&af?C("--good"):(!b4&&!af?C("--bad"):(b4?C("--warn"):C("--muted")));g.globalAlpha=z===sel?1:0.55;g.fill();g.globalAlpha=1;
+      if(z===sel){g.lineWidth=2.5;g.strokeStyle=C("--ink");g.stroke()}pts.push({x,y,r,z})}
+    view={pts};
+    const held=Z.filter(z=>z.v==="holds"||z.v==="weaker").length;
+    $("#ex-cap").innerHTML=`${T.length.toLocaleString("en-IN")} trades · ${Z.length.toLocaleString("en-IN")} zones with ${st.minN}+ trades · <b style="color:var(--good)">${held}</b> worked before and after. <span style="color:var(--good)">●</span> worked both times <span style="color:var(--warn)">●</span> stopped working <span style="color:var(--bad)">●</span> never worked · size = trades · tap a dot`;
+    if(!panel)return;
+    if(!sel){const best=Z.filter(z=>z.v==="holds").sort((a,b)=>Math.min(b.ta,b.ea)*Math.sqrt(b.n)-Math.min(a.ta,a.ea)*Math.sqrt(a.n));showTop(best)}else detail(sel)}
+  function hit(e){const cv=$("#ex-map"),r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=1e9;
+    for(const p of (view||{pts:[]}).pts){const d=Math.hypot(p.x-x,p.y-y);if(d<Math.max(p.r,10)&&d<bd){bd=d;best=p}}return {best,x,y}}
+  function showTop(best){const el=$("#ex-sel");if(!best.length){el.innerHTML='<div class="card note">No zone kept working after the split date with these settings.</div>';return}
+    el.innerHTML=`<div class="card"><h3>Best zones that kept working</h3><div class="extop">${best.slice(0,6).map((z,i)=>`<button data-i="${i}"><span>${esc(zname(z))}</span><span class="mono" style="white-space:nowrap;color:var(--good)">${r2(z.ta)} → ${r2(z.ea)}R · ${z.n}</span></button>`).join("")}</div></div>`;
+    el.querySelectorAll("button[data-i]").forEach(b=>b.onclick=()=>{sel=best[+b.dataset.i];draw()})}
+  function detail(z){const el=$("#ex-sel");const rs=T.filter(t=>z.cb.every((f,j)=>B[f].code(t.x[f])===z.parts[j]));
+    const sy={};rs.forEach(t=>sy[t.sym]=(sy[t.sym]||0)+1);const topS=Object.entries(sy).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const others=FK.filter(f=>!z.cb.includes(f));const sf=st.splitBy&&others.includes(st.splitBy)?st.splitBy:others[0];
+    el.innerHTML=`<div class="card"><div class="exsel"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div class="rules">${z.cb.map((f,j)=>`${esc(F[f].label)}: <b>${esc(B[f].labels[z.parts[j]])}</b>`).join("<br>")}</div><div>${vp(z.v)} <button id="ex-x" aria-label="Close">✕</button></div></div>
+     <div class="exnum"><div><b>${z.n}</b><span>trades</span></div><div><b style="color:var(${z.avg>0?"--good":"--bad"})">${r2(z.avg)}R</b><span>average</span></div><div><b>${z.pf==null?"–":nf(z.pf,2)}</b><span>profit factor</span></div><div><b>${r2(z.ta)} → ${r2(z.ea)}</b><span>before → after (n ${z.tn} / ${z.en})</span></div></div></div>
+     <div class="row" style="gap:8px;margin-top:12px;align-items:center"><span class="note">Split this zone by</span><select id="ex-sf">${others.map(f=>`<option value="${f}"${f===sf?" selected":""}>${esc(F[f].label)}</option>`).join("")}</select></div><div class="exsplit" id="ex-sp"></div>
+     ${st.scope!=="stock"?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:12px"><span class="note">Most trades:</span>${topS.map(([s,k])=>`<button class="pill p-neutral" data-s="${esc(s)}">${esc(s)} ${k}</button>`).join("")}</div>`:""}</div>`;
+    const split=()=>{const f=$("#ex-sf").value;st.splitBy=f;exSave(st);const g={};rs.forEach(t=>{const c=B[f].code(t.x[f]);(g[c]=g[c]||[]).push(t.R)});
+      const rows=Object.entries(g).map(([c,a])=>({l:B[f].labels[c],s:exStats(a)})).filter(o=>o.l!=="n/a").sort((a,b)=>B[f].labels.indexOf(a.l)-B[f].labels.indexOf(b.l));
+      const mx=Math.max(0.2,...rows.map(o=>Math.abs(o.s.avg)));
+      $("#ex-sp").innerHTML=rows.map(o=>`<span>${esc(o.l)}</span><div style="display:flex;align-items:center;height:14px"><div style="width:50%;display:flex;justify-content:flex-end">${o.s.avg<0?`<div class="bar" style="width:${Math.abs(o.s.avg)/mx*100}%;background:var(--bad);opacity:${o.s.n<10?0.35:0.9}"></div>`:""}</div><div style="width:50%;border-left:1px solid var(--line)">${o.s.avg>0?`<div class="bar" style="width:${o.s.avg/mx*100}%;background:var(--good);opacity:${o.s.n<10?0.35:0.9}"></div>`:""}</div></div><span class="mono" style="text-align:right">${r2(o.s.avg)} <span class="note">${o.s.n}</span></span>`).join("")};
+    $("#ex-sf").onchange=split;split();$("#ex-x").onclick=()=>{sel=null;draw()};
+    el.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>goCompany(b.dataset.s))}
+  function varsUI(){$("#ex-vars").innerHTML=FK.filter(f=>F[f].kind==="num").map(f=>`<div><span style="font-size:13px">${esc(F[f].label)}</span><input data-b="${f}" value="${esc(st.bins[f]??EX_BINS[f]??"auto:4")}" aria-label="Steps for ${esc(F[f].label)}"></div>`).join("");
+    $("#ex-vars").querySelectorAll("[data-b]").forEach(inp=>inp.onchange=()=>{st.bins[inp.dataset.b]=inp.value;save();sel=null;compute()})}
+  const cv=$("#ex-map"),tip=$("#ex-tip");
+  cv.addEventListener("mousemove",e=>{const {best,x,y}=hit(e);if(!best){tip.hidden=true;return}const z=best.z;tip.hidden=false;
+    tip.innerHTML=`<b>${esc(zname(z))}</b><br>${z.n} trades · ${r2(z.avg)}R · PF ${z.pf==null?"–":nf(z.pf,2)}<br>before ${r2(z.ta)} → after ${r2(z.ea)}`;
+    const w=cv.clientWidth;tip.style.left=Math.min(w-270,Math.max(0,x+12))+"px";tip.style.top=Math.max(0,y-10)+"px"});
+  cv.addEventListener("mouseleave",()=>tip.hidden=true);
+  cv.addEventListener("click",e=>{const {best}=hit(e);tip.hidden=true;sel=best?best.z:null;draw();if(best&&window.innerWidth<700)$("#ex-sel").scrollIntoView({behavior:"smooth",block:"start"})});
+  $("#ex-scope").onchange=e=>{st.scope=e.target.value;if(st.scope==="all"&&st.minN<100)st.minN=100;if(st.scope==="stock"&&st.minN>30)st.minN=10;$("#ex-min").value=st.minN;save();loadTrades()};
+  $("#ex-sym").onchange=e=>{st.sym=e.target.value;selectCompany(st.sym);save();loadTrades()};
+  $("#ex-k").onchange=e=>{st.k=+e.target.value;save();sel=null;compute()};
+  $("#ex-min").onchange=e=>{st.minN=+e.target.value;save();sel=null;compute()};
+  $("#ex-metric").onchange=e=>{st.metric=e.target.value;save();draw()};
+  Object.keys(EX_RULE).forEach(k=>{const el=$("#r-"+k);if(el)el.onchange=()=>{rule[k]=k==="use_target"?el.value==="true":+el.value;save();loadTrades().then(save)}});
+  if(S.exResize)window.removeEventListener("resize",S.exResize);let rt,lw=window.innerWidth;
+  S.exResize=()=>{if(window.innerWidth===lw)return;lw=window.innerWidth;clearTimeout(rt);rt=setTimeout(()=>{if(location.hash.slice(1)==="explore"&&$("#ex-map"))draw(false)},200)};
+  window.addEventListener("resize",S.exResize);
+  varsUI();await loadTrades();
+}
+async function viewNews(){
+  const v=$("#view");v.innerHTML='<div class="empty">Loading…</div>';
+  let ev=[];try{ev=await getJSON("data/events.json")}catch(e){}
+  const subj=[...new Set(ev.map(e=>e.subject).filter(Boolean))].sort();
+  v.innerHTML=`<div class="grid" style="gap:var(--s4)"><div><h1>Announcements</h1><p class="muted" style="margin:4px 0 0">Nifty 500 filings from NSE's public feeds, collected every evening. History grows from the day the app started.</p></div>
+   <div class="row"><select id="ns" aria-label="Type"><option value="">All types</option>${subj.map(s=>`<option>${esc(s)}</option>`).join("")}</select><input id="nq" placeholder="Filter by symbol" aria-label="Filter by symbol"></div>
+   <div class="card" id="nf"></div></div>`;
+  const draw=()=>{const s=$("#ns").value,q=$("#nq").value.trim().toUpperCase();const it=ev.filter(e=>(!s||e.subject===s)&&(!q||e.symbol.includes(q))).slice(0,200);$("#nf").innerHTML=feedHtml(it)||"<p class='muted'>Nothing yet.</p>"};
+  $("#ns").onchange=draw;$("#nq").oninput=draw;draw();
+}
+
+
+/* ================= NEWS FOR ONE SCRIP ================= */
+const NTHEMES=["Results","Orders and deals","Analyst views","Dividend and capital","Management","Regulatory and legal","Share price","Other"];
+function ago(d){const ms=Date.now()-Date.parse(d+"Z");const h=ms/36e5;return h<1?"just now":h<24?Math.round(h)+"h ago":Math.round(h/24)+"d ago"}
+const safeUrl=u=>/^https:\/\//.test(u||"")?u:"";
+async function viewScrip(sym){
+  const v=$("#view");if(!sym){v.innerHTML='<div class="empty">Pick a company first.</div>';return}
+  selectCompany(sym);v.innerHTML='<div class="empty">Loading news…</div>';
+  const r=(S.summary||[]).find(x=>x.symbol===sym)||{};
+  let nw=null,ev=[];
+  try{nw=await getJSON("data/news/"+sym.replace(/&/g,"_")+".json")}catch(e){}
+  try{ev=(await getJSON("data/events.json")).filter(e=>e.symbol===sym).slice(0,8)}catch(e){}
+  if(location.hash.slice(1)!=="scrip"&&location.hash.slice(1)!=="scrip-"+enc(sym))return;
+  const items=(nw&&nw.items)||[];S.scripNews={symbol:sym,name:r.name||nw?.name||sym,items};
+  const now=Date.now(),inDays=(it,d)=>now-Date.parse(it.d+"Z")<d*864e5;
+  const n7=items.filter(i=>inDays(i,7)).length,n30=items.filter(i=>inDays(i,30)).length;
+  const recent=items.filter(i=>inDays(i,14));
+  const by={};recent.forEach(i=>(by[i.theme]=by[i.theme]||[]).push(i));
+  const lk=i=>safeUrl(i.url)?`<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.t)}</a>`:esc(i.t);
+  const brief=NTHEMES.filter(t=>by[t]).map(t=>`<li><b>${esc(t)}</b> <span class="note">(${by[t].length})</span><br>${lk(by[t][0])} <span class="note">· ${esc(by[t][0].src||"")}, ${ago(by[t][0].d)}</span></li>`).join("");
+  const opts=(S.summary||[]).map(x=>`<option value="${esc(x.symbol)}">${esc(x.name||"")}</option>`).join("");
+  v.innerHTML=`<div class="grid" style="gap:var(--s4)">
+   <div><h1>${esc(r.name||sym)} <span class="mono note">${esc(sym)}</span></h1>
+    <p class="muted" style="margin:4px 0 0">Latest news headlines with links to the original sources, collected every evening from Google News. ${nw?`Last checked ${esc((nw.updated||"").replace("T"," "))} UTC.`:""}</p>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><input id="sn-pick" list="sn-list" placeholder="Another company (symbol)" aria-label="Pick company" style="max-width:240px"><datalist id="sn-list">${opts}</datalist>
+     <a class="pill" href="#company-${enc(sym)}" style="border-color:var(--line);text-decoration:none;color:var(--ink)">Company page</a></div></div>
+   <div class="card"><h2 style="margin-top:0">In brief</h2>
+    ${items.length?`<p style="margin:0 0 8px"><b>${n7}</b> stories in the last 7 days, <b>${n30}</b> in 30 days.${recent.length?" What the last two weeks were about:":" Nothing in the last two weeks."}</p>${brief?`<ul class="sn-brief">${brief}</ul>`:""}`:`<p class="muted" style="margin:0">${nw?"No headlines naming this company in the last 30 days.":"No news collected for this company yet. It fills in after the next evening update."}</p>`}
+    ${items.length?`<p style="margin:10px 0 0"><button id="sn-ai" type="button">Summarise with Claude</button> <span class="note">Uses your Ask Claude key; reads the headlines and replies with source links.</span></p>`:""}</div>
+   ${ev.length?`<div class="card"><h2 style="margin-top:0">Exchange filings</h2>${feedHtml(ev,false)}</div>`:""}
+   <div class="card"><h2 style="margin-top:0">All headlines</h2>
+    <div class="row sn-f" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">${["All",...NTHEMES.filter(t=>items.some(i=>i.theme===t))].map((t,k)=>`<button type="button" class="${k?"":"on"}" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+    <div id="sn-l"></div></div></div>`;
+  const draw=t=>{const it=items.filter(i=>t==="All"||i.theme===t);let last="";
+    $("#sn-l").innerHTML=it.length?it.map(i=>{const day=i.d.slice(0,10),hd=day!==last?`<div class="note mono" style="margin:10px 0 4px">${esc(day)}</div>`:"";last=day;
+      return hd+`<div class="sn-it">${lk(i)}<div class="note">${esc(i.src||"")} · ${esc(i.theme)} · ${ago(i.d)}</div></div>`}).join(""):"<p class='muted'>Nothing yet.</p>"};
+  draw("All");
+  v.querySelectorAll(".sn-f button").forEach(b=>b.onclick=()=>{v.querySelectorAll(".sn-f button").forEach(x=>x.classList.toggle("on",x===b));draw(b.dataset.t)});
+  $("#sn-pick").onchange=e=>{const q=e.target.value.trim().toUpperCase();const m=(S.summary||[]).find(x=>x.symbol===q)||(S.summary||[]).find(x=>(x.name||"").toUpperCase().startsWith(q));if(m&&m.symbol!==sym){e.target.onchange=null;setTimeout(()=>go("scrip-"+enc(m.symbol)),0)}};
+  const ai=$("#sn-ai");if(ai)ai.onclick=()=>{if(window.AskClaude)AskClaude.ask(`Summarise the latest news on ${r.name||sym} in a few bullets: what happened, and what might matter for the business or the share price. Cite each point with a markdown link to its source headline.`);};
+}
+
+/* ================= METHOD ================= */
+function viewMethod(){
+  const c=S.meta.config||{};
+  $("#view").innerHTML=`<div class="prose">
+  <h1>How the valuation works</h1>
+  <p>Every evening after NSE closes, the pipeline pulls official closing prices, new filings and refreshed fundamentals, then recomputes everything below. It is a research aid. It is not investment advice.</p>
+  <h2>1. Coffee Can filter (primary)</h2>
+  <p>From Saurabh Mukherjea's <i>Coffee Can Investing</i>: a company qualifies only if revenue grew more than ${pct(c.cc_rev_growth,0)} and ROCE was above ${pct(c.cc_roce,0)} in <b>every</b> one of the last ${c.cc_years} years. Missing one year fails it. That is the point: consistency signals a durable moat. For lenders, ROE stands in for ROCE until the book's exact banking criteria are added. With fewer than 10 years of data the result reads "passes N years", and adding a Screener export completes the test.</p>
+  <h2>2. Buffett-style quality</h2>
+  <p>Durable ROE above 15%, debt-to-equity below 0.5, stable operating margins, positive free cash flow, operating cash flow that tracks reported profit, and the retained-earnings test (each rupee kept in the business should create at least a rupee of market value).</p>
+  <h2>3. Damodaran-style valuation</h2>
+  <p><b>Reverse DCF.</b> A two-stage FCFE model, where growth must be paid for by reinvestment (reinvestment rate = growth ÷ ROE). The price is solved backwards for the profit growth it implies over ${c.high_growth_years} years, then a terminal growth of ${pct(c.terminal_growth,1)}. Cost of equity = India risk-free ${pct(c.risk_free,1)} + beta × equity risk premium ${pct(c.equity_risk_premium,1)}, with beta clamped between 0.6 and 1.6.</p>
+  <p><b>Expected growth</b> is the median of analyst next-year EPS growth, 3-year revenue CAGR and 3-year profit CAGR, capped between −5% and 25%. The bear and bull values use 4 points less and 4 points more growth.</p>
+  <p><b>Relative value.</b> Current PE against the company's own history, and against a sector regression of PE on ROCE (ROE for lenders) and growth, which gives a quality-adjusted "justified PE".</p>
+  <h2>Verdict</h2>
+  <p>Three signals are blended, each weighted by how much evidence is behind it: the reverse DCF gap between price-implied and supportable growth (45%), the premium over the peer-justified PE (35%), and the PE percentile in the company's own history (up to 20%, scaled down when there are fewer than 7 years of history, because 2 or 3 years of PE data says little). Scores beyond ±0.35 read "Looks expensive" or "Looks cheap". A guard-rail applies on top: a price above 1.5x even the bull-case DCF value is always "Looks expensive", and a price below two-thirds of the bear-case value is always "Looks cheap". The company page shows each signal's direction and weight, plus the reasons behind it.</p>
+  <h2>Data and its limits</h2>
+  <ul><li>Prices: NSE bhavcopy (official daily file), backfilled from Yahoo Finance with split-adjusted history.</li>
+  <li>Fundamentals: Yahoo Finance gives about 4 annual years and recent quarters, plus analyst estimates. For 10 to 12 years, export the company from Screener.in yourself and drop the file in <span class="mono">data/screener_exports/</span>. The app never scrapes Screener, because its terms don't allow it.</li>
+  <li>Announcements: NSE's public RSS feeds, accumulated daily.</li>
+  <li>Historical market cap uses today's share count on split-adjusted prices, so large buybacks or equity raises distort old multiples a little.</li></ul>
+  <p class="note">Last updated ${esc(S.meta.updated||"")} · prices to ${esc(S.meta.price_date||"")}</p></div>`;
+}
+
+/* ---------- boot ---------- */
+(async function(){
+  try{
+    [S.summary,S.sectors,S.meta]=await Promise.all([getJSON("data/summary.json"),getJSON("data/sectors.json"),getJSON("data/meta.json")]);
+    if(S.lastCompany)selectCompany(S.lastCompany);
+    S.sectorKeys=Object.keys(S.sectors).sort();
+    $("#asof").textContent="prices to "+(S.meta.price_date||"?");
+    setupSearch();route();
+  }catch(e){$("#view").innerHTML='<div class="empty">Could not load data: '+esc(e.message)+'</div>'}
+})();
+</script>
+<script src="assets/ask-claude.js?v=2"></script>
+<script src="assets/notes.js?v=1"></script>
+
+<script>if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
+</html>
